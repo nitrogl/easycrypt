@@ -254,9 +254,10 @@ theory MtE.
           (* encryption oracle *)
           (* equivalence *)
           proc; inline *.
-          wp=> /=; call (_: true).
-          wp=> /=; call (_: true).
-          by auto; smt.
+          wp=> /=; call (: true).
+          wp=> /=; call (: true).
+          auto=> /> &1 &2 -> /= s1_exteq_s2 not_win1 p'; rewrite !in_fsetU !in_fset1.
+          by case: (p' = p{2})=> //=; rewrite s1_exteq_s2.
           (* lossless after win *)
           by move=> &2 win; proc; wp; call (MtE_enc_ll E M E_enc_ll M_tag_ll).
           (* lossless and preservation of win *)
@@ -281,7 +282,7 @@ theory MtE.
           if=> //=.
             auto; call (_: true); auto=> /> &1 &2 -> /> eq_qs -> /> _.
             by case: (pt{2})=> //= -[p t] r; case: r=> //= _; rewrite !oget_some /= eq_qs.
-          by auto; smt.
+          by auto=> /> /#.
         (* lossless after win *)
         by move=> &2 bad; proc; wp; call (MtE_dec_ll E M E_dec_ll M_verify_ll).
         (* lossless and preservation of win *)
@@ -289,13 +290,13 @@ theory MtE.
           by inline *; wp; call (_: true); auto.
           by inline *; wp; call E_dec_ll; auto.
           if=> /=.
-            by inline *; auto; call M_verify_ll; auto; smt.
+            by inline *; auto; call M_verify_ll; auto=> /#.
           done.
         (* back to the experiment *)
         swap{2} 4 -3.
         wp; call (_: true).
         wp; call (_: true).
-        by auto; smt.
+        by auto=> /#.
       qed.
     end section PTXT.
   end RCPA_WUF_PTXT.
