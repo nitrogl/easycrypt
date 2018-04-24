@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -777,7 +778,7 @@ qed.
 
 lemma weight_dmap (d : 'a distr) (f : 'a -> 'b) :
   weight (dmap d f) = weight d.
-proof. by rewrite /weight {2}(_: predT = preim f predT) // dmapE. qed.
+proof. by rewrite (_: predT = preim f predT) // dmapE. qed.
 
 lemma dmap_ll (d : 'a distr) (f : 'a -> 'b) : 
   is_lossless d => is_lossless (dmap d f).

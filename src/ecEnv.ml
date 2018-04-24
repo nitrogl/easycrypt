@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -2610,6 +2611,7 @@ module Ax = struct
     fst (lookup name env)
 
   let bind name ax env =
+    let ax = NormMp.norm_ax env ax in
     let env = MC.bind_axiom name ax env in
     { env with env_item = CTh_axiom (name, ax) :: env.env_item }
 

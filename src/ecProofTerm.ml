@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -430,6 +431,7 @@ let ffpattern_of_genpattern hyps (ge : genpattern) =
   | `ProofTerm pe     -> Some pe
   | `Form (Some _, _) -> None
   | `Form (None, fp)  -> ffpattern_of_form hyps fp
+  | `LetIn _          -> None
 
 (* -------------------------------------------------------------------- *)
 let process_named_pterm pe (tvi, fp) =

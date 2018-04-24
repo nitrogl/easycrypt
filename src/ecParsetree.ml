@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -79,7 +80,7 @@ and pexpr_r =
   | PEforall of ptybindings * pexpr               (* forall quant.      *)
   | PEexists of ptybindings * pexpr               (* exists quant.      *)
   | PElambda of ptybindings * pexpr               (* lambda abstraction *)
-  | PErecord of pexpr rfield list                 (* record             *)
+  | PErecord of pexpr option * pexpr rfield list  (* record             *)
   | PEproj   of pexpr * pqsymbol                  (* projection         *)
   | PEproji  of pexpr * int                       (* tuple projection   *)
   | PEscope  of pqsymbol * pexpr                  (* scope selection    *)
@@ -239,7 +240,7 @@ and pformula_r =
   | PFforall of pgtybindings * pformula
   | PFexists of pgtybindings * pformula
   | PFlambda of ptybindings * pformula
-  | PFrecord of pformula rfield list
+  | PFrecord of pformula option * pformula rfield list
   | PFproj   of pformula * pqsymbol
   | PFproji  of pformula * int
   | PFglob   of pmsymbol located
@@ -618,6 +619,7 @@ type pprover_infos = {
   pprov_timeout   : int option;
   pprov_cpufactor : int option;
   pprov_names     : pprover_list option;
+  pprov_quorum    : int option;
   pprov_verbose   : int option option;
   pprov_version   : [`Lazy | `Full] option;
   plem_all        : bool option;
@@ -633,6 +635,7 @@ let empty_pprover = {
   pprov_timeout   = None;
   pprov_cpufactor = None;
   pprov_names     = None;
+  pprov_quorum    = None;
   pprov_verbose   = None;
   pprov_version   = None;
   plem_all        = None;
@@ -711,7 +714,9 @@ and icasemode_full =
   [`AtMost of int | `AsMuch]
 
 type genpattern =
-  [ `ProofTerm of ppterm | `Form of (rwocc * pformula) ]
+  [ `ProofTerm of ppterm
+  | `Form of (rwocc * pformula)
+  | `LetIn of psymbol ]
 
 type prevert = {
   pr_clear : psymbol list;
@@ -790,6 +795,7 @@ and ptactic_core_r =
   | PPhl        of phltactic
   | Pprogress   of ppgoptions * ptactic_core option
   | Psubgoal    of ptactic_chain
+  | Pnstrict    of ptactic_core
   | Padmit
   | Pdebug
 

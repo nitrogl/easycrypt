@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -634,7 +635,7 @@ end
 (* -------------------------------------------------------------------- *)
 type genclear = [`Clear | `TryClear | `NoClear]
 
-let t_generalize_hyps_x ?(missing = false) ?naming ids tc =
+let t_generalize_hyps_x ?(missing = false) ?naming ?(letin = false) ids tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
 
   let fresh x =
@@ -656,6 +657,13 @@ let t_generalize_hyps_x ?(missing = false) ?naming ids tc =
       in
 
       match LDecl.ld_subst s (LDecl.by_id id hyps) with
+      | LD_var (ty, Some body) when letin ->
+          let x    = fresh id in
+          let s    = Fsubst.f_bind_rename s id x ty in
+          let bds  = `LetIn (x, GTty ty, body) :: bds in
+          let args = args in
+          (s, bds, args, cls)
+
       | LD_var (ty, _) ->
           let x    = fresh id in
           let s    = Fsubst.f_bind_rename s id x ty in
@@ -701,8 +709,9 @@ let t_generalize_hyps_x ?(missing = false) ?naming ids tc =
     List.fold_left
       (fun ff bd ->
         match bd with
-        | `Forall (x, xty) -> f_forall [x, xty] ff
-        | `Imp    pre      -> f_imp pre ff)
+        | `Forall (x, xty)  -> f_forall [x, xty] ff
+        | `Imp    pre       -> f_imp pre ff
+        | `LetIn  (x, _, f) -> f_let1 x f ff)
       (Fsubst.f_subst s concl) bds in
 
   let pt = { pt_head = PTCut ff; pt_args = List.rev args; } in
@@ -714,16 +723,16 @@ let t_generalize_hyps_x ?(missing = false) ?naming ids tc =
 
   in FApi.t_onall ct tc
 
-let t_generalize_hyps ?(clear = `No) ?missing ?naming ids tc =
+let t_generalize_hyps ?(clear = `No) ?missing ?naming ?letin ids tc =
   let ids =
     match clear with
     | `Yes -> List.map (fun x -> (`Clear   , x)) ids
     | `Try -> List.map (fun x -> (`TryClear, x)) ids
     | `No  -> List.map (fun x -> (`NoClear , x)) ids
-  in t_generalize_hyps_x ?missing ?naming ids tc
+  in t_generalize_hyps_x ?missing ?naming ?letin ids tc
 
-let t_generalize_hyp ?clear ?missing ?naming id tc =
-  t_generalize_hyps ?clear ?missing ?naming [id] tc
+let t_generalize_hyp ?clear ?missing ?naming ?letin id tc =
+  t_generalize_hyps ?clear ?missing ?naming ?letin [id] tc
 
 (* -------------------------------------------------------------------- *)
 module LowAssumption = struct
