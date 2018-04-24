@@ -592,6 +592,7 @@ type phltactic =
 
     (* Automation *)
   | Pauto
+  | Plossless
 
 (* -------------------------------------------------------------------- *)
 type include_exclude = [ `Include | `Exclude ]

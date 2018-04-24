@@ -8,6 +8,7 @@
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcParsetree
 open EcTypes
 open EcFol
 open EcModules
@@ -119,3 +120,62 @@ let t_phl_trivial_r tc =
 
 (* -------------------------------------------------------------------- *)
 let t_phl_trivial = FApi.t_low0 "phl-trivial" t_phl_trivial_r
+
+(* -------------------------------------------------------------------- *)
+type ll_strategy = LL_WP | LL_RND | LL_COND of ll_strategy list pair
+
+exception NoLLStrategy
+
+let rec ll_strategy_of_stmt (s : stmt) =
+  List.rev_map ll_strategy_of_instr s.s_node
+
+and ll_strategy_of_instr (i : instr) =
+  match i.i_node with
+  | Sasgn _ -> LL_WP
+  | Srnd  _ -> LL_RND
+
+  | Sif (_, s1, s2) ->
+      LL_COND (ll_strategy_of_stmt s1, ll_strategy_of_stmt s2)
+
+  | _ -> raise NoLLStrategy
+
+(* -------------------------------------------------------------------- *)
+let rec apply_ll_strategy (lls : ll_strategy list) tc =
+  match lls with
+  | [] ->
+      t_id tc
+  | lls1 :: lls ->
+      FApi.t_last (apply_ll_strategy lls) (apply_ll_strategy1 lls1 tc)
+
+and apply_ll_strategy1 (lls : ll_strategy) tc =
+  match lls with
+  | LL_WP ->
+      EcPhlWp.t_wp (Some (Single (-1))) tc
+
+  | LL_RND ->
+      EcPhlRnd.t_bdhoare_rnd PNoRndParams tc
+
+  | LL_COND (lls1, lls2) ->
+      (EcPhlCond.t_bdhoare_cond
+         @+ [apply_ll_strategy lls1; apply_ll_strategy lls2]) tc
+
+(* -------------------------------------------------------------------- *)
+let t_lossless_r tc =
+  let lls = ll_strategy_of_stmt (tc1_as_bdhoareS tc).bhs_s in
+
+  let tt =
+    (  apply_ll_strategy lls
+    @~ FApi.t_onall EcPhlSkip.t_skip)
+    @~ FApi.t_onall (EcLowGoal.t_crush ~delta:true) in
+
+  let tactic =
+    (EcPhlConseq.t_bdHoareS_conseq f_true f_true
+        @~ FApi.t_on1 (-1) ~ttout:t_trivial
+             (EcPhlConseq.t_bdHoareS_conseq_bd FHeq f_r1))
+        @~ FApi.t_on1 (-1) ~ttout:t_trivial
+             tt
+
+  in FApi.t_onall t_trivial (tactic tc)
+
+(* -------------------------------------------------------------------- *)
+let t_lossless = FApi.t_low0 "lossless" t_lossless_r
