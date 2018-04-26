@@ -15,26 +15,27 @@ require (*--*) Mu_mem.
 (** A non-negative integer q **)
 op q : { int | 0 <= q } as ge0_q.
 
-(** A type T equipped with its full uniform distribution **)
+(** A type T equipped with some distribution uT **)
 type T.
 
 op uT: T distr.
-op maxu : T.
-axiom maxuP x: mu1 uT x <= mu1 uT maxu.
+
+(** An element maxu of T with maximal probability **)
+op maxu : { T | forall x, mu1 uT x <= mu1 uT maxu } as maxuP.
 
 (** A module that samples in uT on queries to s **)
 module Sample = {
-  var l:T list
+  var l : T list
 
   proc init(): unit = {
-    l = [];
+    l <- [];
   }
 
   proc s(): T = {
     var r;
 
-    r = $uT;
-    l = r::l;
+    r <$ uT;
+    l <- r::l;
     return r;
   }
 }.
@@ -54,12 +55,10 @@ module type Adv(S:ASampler) = {
 }.
 
 (** And an experiment that initializes the sampler and runs the adversary **)
-module Exp(S:Sampler,A:Adv) = {
-  module A = A(S)
-
+module Exp (S:Sampler) (A:Adv) = {
   proc main(): unit = {
     S.init();
-    A.a();
+    A(S).a();
   }
 }.
 
@@ -67,77 +66,77 @@ module Exp(S:Sampler,A:Adv) = {
     the probability that the same output is sampled twice is bounded
     by q^2/|T|                                                        **)
 section.
-  declare module A:Adv {Sample}.
-  axiom A_ll (S <: ASampler {A}): islossless S.s => islossless A(S).a.
+declare module A:Adv {Sample}.
+axiom A_ll (S <: ASampler {A}): islossless S.s => islossless A(S).a.
+axiom A_bounded: hoare [A(Sample).a : size Sample.l = 0 ==> size Sample.l <= q].
 
-  lemma pr_Sample_le &m:
-    Pr[Exp(Sample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l]
-    <= (q^2)%r * mu1 uT maxu.
-  proof.
-    fel 1 (size Sample.l) (fun x, q%r * mu1 uT maxu) q (!uniq Sample.l) []=> //.
-    + rewrite Bigreal.sumr_const count_predT size_range /=.
-      rewrite max_ler 1:smt mulrA ler_wpmul2r 1:smt //.
-      have ->: q^2 = q * q by rewrite (_:2 = 1 + 1) // powS // pow1.
-      by rewrite -fromintM le_fromint ler_wpmul2r 1:ge0_q /#.
-    + by inline*; auto.
-    + proc;wp; rnd (mem Sample.l); skip=> // /> &hr ???.
-      have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu1 uT maxu) _.
-      + by move=> x _;rewrite maxuP.
-      move=> /ler_trans Hle;apply/Hle/ler_wpmul2r;smt (mu_bounded).
-    by move=> c; proc; auto=> /#.
-  qed.
+lemma pr_Sample_le &m:
+  Pr[Exp(Sample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l]
+  <= (q^2)%r * mu1 uT maxu.
+proof.
+fel 1 (size Sample.l) (fun x=> q%r * mu1 uT maxu) q (!uniq Sample.l) []=> //.
++ rewrite Bigreal.sumr_const count_predT size_range /=.
+  rewrite max_ler 1:[smt(ge0_q)] mulrA ler_wpmul2r 1:[smt(ge0_mu)] //.
+  rewrite (powS 1 q) // pow1.
+  by rewrite -fromintM le_fromint ler_wpmul2r 1:ge0_q /#.
++ by inline*; auto.
++ proc;wp; rnd (mem Sample.l); skip=> // /> &hr _ _ _.
+  have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu1 uT maxu) _.
+  + by move=> x _; rewrite maxuP.
+  move=> /ler_trans Hle; apply/Hle/ler_wpmul2r.
+  + smt(ge0_mu).
+  by rewrite le_fromint; exact ltzW.
+by move=> c; proc; auto=> /#.
+qed.
 
-  axiom A_bounded: hoare [A(Sample).a : size Sample.l = 0 ==> size Sample.l <= q].
-
-  lemma pr_collision &m:
-    Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l]
-    <= (q^2)%r * mu1 uT maxu.
-  proof.
-    cut ->: Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l] =
-            Pr[Exp(Sample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l].
-    + byequiv (_: ={glob A} ==> ={Sample.l} /\ size Sample.l{2} <= q)=> //=.
-      conseq (_: _ ==> ={Sample.l}) _ (_: _ ==> size Sample.l <= q)=> //=;2:by sim.
-      by proc;call A_bounded;inline *;auto.
-    by apply (pr_Sample_le &m).
-  qed.
-
+lemma pr_collision &m:
+  Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l]
+  <= (q^2)%r * mu1 uT maxu.
+proof.
+have ->: Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l] =
+         Pr[Exp(Sample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l].
++ byequiv (: ={glob A} ==> ={Sample.l} /\ size Sample.l{2} <= q)=> //=.
+  conseq (: _ ==> ={Sample.l}) _ (: _ ==> size Sample.l <= q)=> //=; 2:by sim.
+  by proc; call A_bounded; inline *; auto.
+by apply (pr_Sample_le &m).
+qed.
 end section.
 
 (*** The same result using a bounding module ***)
-module Bounder(S:Sampler) = {
+module Bounder (S:Sampler) = {
   var c:int
 
   proc init(): unit = {
     S.init();
-    c = 0;
+    c <- 0;
   }
 
   proc s(): T = {
-    var r = witness;
+    var r <- witness;
 
     if (c < q) {
-      r = S.s();
-      c = c + 1;
+      r <@ S.s();
+      c <- c + 1;
     }
     return r;
   }
 }.
 
-module ABounder(S:ASampler) = {
+module ABounder (S:ASampler) = {
   proc s(): T = {
-    var r = witness;
+    var r <- witness;
 
     if (Bounder.c < q) {
-      r = S.s();
-      Bounder.c = Bounder.c + 1;
+      r         <@ S.s();
+      Bounder.c <- Bounder.c + 1;
     }
     return r;
   }
 }.
 
-module Bounded(A:Adv,S:ASampler) = {
+module Bounded (A:Adv) (S:ASampler) = {
   proc a(): unit = {
-    Bounder.c = 0;
+    Bounder.c <- 0;
     A(ABounder(S)).a();
   }
 }.
@@ -152,23 +151,21 @@ proof. by proc; inline*; sim. qed.
     probability that the same output is sampled twice is bounded by
     q^2/|T|                                                         **)
 section.
-  declare module A:Adv {Sample,Bounder}.
+declare module A:Adv {Sample,Bounder}.
+axiom A_ll (S <: ASampler {A}): islossless S.s => islossless A(S).a.
 
-  axiom A_ll (S <: ASampler {A}): islossless S.s => islossless A(S).a.
-
-  lemma pr_collision_bounded_oracles &m:
-    Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l]
-    <= (q^2)%r * mu1 uT maxu.
-  proof.
-    cut ->: Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l] =
-            Pr[Exp(Sample,Bounded(A)).main() @ &m: !uniq Sample.l].
-    + byequiv (PushBound Sample A) => //.
-    apply (pr_collision (Bounded(A)) _ _ &m).
-    + move=> S HS;proc;call (A_ll (ABounder(S)) _);2:by auto.
-      by proc;sp;if;auto;call HS.     
-    proc; call (_: size Sample.l <= Bounder.c <= q).
-    + proc;sp;if=>//;inline *;auto=> /#.
-    auto;smt w=ge0_q.
-  qed.
-
+lemma pr_collision_bounded_oracles &m:
+  Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l]
+  <= (q^2)%r * mu1 uT maxu.
+proof.
+have ->: Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l] =
+         Pr[Exp(Sample,Bounded(A)).main() @ &m: !uniq Sample.l].
++ byequiv (PushBound Sample A) => //.
+apply (pr_collision (Bounded(A)) _ _ &m).
++ move=> S HS;proc;call (A_ll (ABounder(S)) _); 2:by auto.
+  by proc; sp; if; auto; call HS.
+proc; call (: size Sample.l <= Bounder.c <= q).
++ proc; sp; if=> //; inline *; auto=> /#.
+by auto; smt(ge0_q).
+qed.
 end section.
