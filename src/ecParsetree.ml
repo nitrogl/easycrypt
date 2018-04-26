@@ -130,6 +130,7 @@ and pmodule_sig_struct = {
 and pmodule_sig_struct_body = pmodule_sig_item list
 
 and pmodule_sig_item = [
+  | `Include      of pmodule_type
   | `FunctionDecl of pfunction_decl
 ]
 
@@ -177,6 +178,8 @@ and pstructure_item =
   | Pst_var    of (psymbol list * pty)
   | Pst_fun    of (pfunction_decl * pfunction_body)
   | Pst_alias  of (psymbol * pgamepath)
+  | Pst_aliass of (psymbol list * pmsymbol)
+
 
 and pfunction_body = {
   pfb_locals : pfunction_local list;
