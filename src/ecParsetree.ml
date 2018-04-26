@@ -174,11 +174,11 @@ and pmodule_expr = pmodule_expr_r located
 and pstructure = pstructure_item located list
 
 and pstructure_item =
-  | Pst_mod    of (psymbol * pqsymbol list * pmodule_expr)
-  | Pst_var    of (psymbol list * pty)
-  | Pst_fun    of (pfunction_decl * pfunction_body)
-  | Pst_alias  of (psymbol * pgamepath)
-  | Pst_aliass of (psymbol list * pmsymbol)
+  | Pst_mod      of (psymbol * pqsymbol list * pmodule_expr)
+  | Pst_var      of (psymbol list * pty)
+  | Pst_fun      of (pfunction_decl * pfunction_body)
+  | Pst_alias    of (psymbol * pgamepath)
+  | Pst_maliases of (psymbol list * pmsymbol)
 
 
 and pfunction_body = {

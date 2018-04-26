@@ -1426,11 +1426,12 @@ and transmodsig_body
                    fs_ret    = resty; }
       and oi = { oi_calls = calls; oi_in = uin; } in
       [Tys_function (sig_, oi)]
+
     | `Include i ->
       let (_modty,sig_) = transmodtype env i in
       if sig_.mis_params <> [] then
         tyerror i.pl_loc env (InvalidModType MTE_IncludeFunctor);
-      let add (Tys_function(fs,_)) =
+      let add (Tys_function (fs, _)) =
         names := mk_loc (loc i) fs.fs_name :: !names in
       List.iter add sig_.mis_body;
       sig_.mis_body
@@ -1669,7 +1670,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
   | Pst_alias ({pl_desc = name},f) ->
     [transstruct1_alias env name f]
 
-  | Pst_aliass (xs, m) ->
+  | Pst_maliases (xs, m) ->
     let do1 x = transstruct1_alias env (unloc x) (mk_loc (loc x) (m, x)) in
     List.map do1 xs
 

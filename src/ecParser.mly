@@ -1391,10 +1391,10 @@ mod_item:
     { Pst_alias (x, f) }
 
 | PROC x=lident EQ m=mod_qident
-    { Pst_aliass ([x], m) }
+    { Pst_maliases ([x], m) }
 
-| PROC xs=plist2(lident,COMMA) EQ m=mod_qident
-    { Pst_aliass (xs, m) }
+| PROC xs=plist2(lident, COMMA) EQ m=mod_qident
+    { Pst_maliases (xs, m) }
 
 (* -------------------------------------------------------------------- *)
 (* Modules                                                              *)
