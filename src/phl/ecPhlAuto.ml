@@ -122,7 +122,8 @@ let t_phl_trivial_r tc =
 let t_phl_trivial = FApi.t_low0 "phl-trivial" t_phl_trivial_r
 
 (* -------------------------------------------------------------------- *)
-type ll_strategy = LL_WP | LL_RND | LL_COND of ll_strategy list pair
+type ll_strategy =
+  LL_WP | LL_RND | LL_CALL | LL_COND of ll_strategy list pair
 
 exception NoLLStrategy
 
@@ -133,6 +134,7 @@ and ll_strategy_of_instr (i : instr) =
   match i.i_node with
   | Sasgn _ -> LL_WP
   | Srnd  _ -> LL_RND
+  | Scall _ -> LL_CALL
 
   | Sif (_, s1, s2) ->
       LL_COND (ll_strategy_of_stmt s1, ll_strategy_of_stmt s2)
@@ -144,6 +146,7 @@ let rec apply_ll_strategy (lls : ll_strategy list) tc =
   match lls with
   | [] ->
       t_id tc
+
   | lls1 :: lls ->
       FApi.t_last (apply_ll_strategy lls) (apply_ll_strategy1 lls1 tc)
 
@@ -158,22 +161,25 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
       @> EcPhlConseq.t_bdHoareS_conseq f_true f_true
       @~ FApi.t_on1 (-1) ~ttout:t_trivial t_id
 
+  | LL_CALL ->
+         EcPhlCall.t_bdhoare_call f_true f_true None
+      @~ FApi.t_swap_goals 0 1
+
   | LL_COND (lls1, lls2) ->
       let condtc =
         EcPhlCond.t_bdhoare_cond
         @+ [apply_ll_strategy lls1; apply_ll_strategy lls2]
       in
 
-         EcPhlApp.t_hoare_app (-1) f_true
-      @~ FApi.t_onalli (function
-          | 0 -> t_close EcPhlTAuto.t_hoare_true;
-          | 1 -> t_id
-          | 2 -> condtc
-          | 3 ->    EcPhlBdHoare.t_hoare_bd_hoare
-                 @! EcPhlTAuto.t_hoare_true
-                 @! t_close t_trivial
-          | 4 -> t_close t_trivial
-          | _ -> t_id)
+        ( EcPhlApp.t_bdhoare_app
+           (-1) (f_true, f_true, f_r1, f_r1, f_r0, f_r1)
+
+        @~ FApi.t_onalli (function
+           | 1 -> t_id
+           | 2 -> condtc
+           | _ -> t_close t_auto))
+
+        @~ FApi.t_rotate `Left 1
 
 (* -------------------------------------------------------------------- *)
 let t_lossless_r tc =
@@ -181,7 +187,7 @@ let t_lossless_r tc =
 
   let tt =
     (  apply_ll_strategy lls
-    @~ FApi.t_onall EcPhlSkip.t_skip)
+    @~ FApi.t_onall (FApi.t_try EcPhlSkip.t_skip))
     @~ FApi.t_onall (EcLowGoal.t_crush ~delta:true) in
 
   let tactic =

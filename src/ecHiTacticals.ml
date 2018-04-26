@@ -205,7 +205,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | PPr pr                    -> EcPhlPr.process_ppr pr
     | Pfel (pos, info)          -> EcPhlFel.process_fel pos info
     | Phoare                    -> EcPhlBdHoare.t_hoare_bd_hoare
-    | Pbdhoare_split i          -> EcPhlBdHoare.process_bdhoare_split i
+    | Pbdhoare_split i          -> EcPhlHiBdHoare.process_bdhoare_split i
     | Pprbounded                -> EcPhlPr.t_prbounded true
     | Psim info                 -> EcPhlEqobs.process_eqobs_in info
     | Ptrans_stmt info          -> EcPhlTrans.process_equiv_trans info
