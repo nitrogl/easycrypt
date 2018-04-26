@@ -148,16 +148,32 @@ let rec apply_ll_strategy (lls : ll_strategy list) tc =
       FApi.t_last (apply_ll_strategy lls) (apply_ll_strategy1 lls1 tc)
 
 and apply_ll_strategy1 (lls : ll_strategy) tc =
-  match lls with
+  tc |> match lls with
+
   | LL_WP ->
-      EcPhlWp.t_wp (Some (Single (-1))) tc
+      EcPhlWp.t_wp (Some (Single (-1)))
 
   | LL_RND ->
-      EcPhlRnd.t_bdhoare_rnd PNoRndParams tc
+         EcPhlRnd.t_bdhoare_rnd PNoRndParams
+      @> EcPhlConseq.t_bdHoareS_conseq f_true f_true
+      @~ FApi.t_on1 (-1) ~ttout:t_trivial t_id
 
   | LL_COND (lls1, lls2) ->
-      (EcPhlCond.t_bdhoare_cond
-         @+ [apply_ll_strategy lls1; apply_ll_strategy lls2]) tc
+      let condtc =
+        EcPhlCond.t_bdhoare_cond
+        @+ [apply_ll_strategy lls1; apply_ll_strategy lls2]
+      in
+
+         EcPhlApp.t_hoare_app (-1) f_true
+      @~ FApi.t_onalli (function
+          | 0 -> t_close EcPhlTAuto.t_hoare_true;
+          | 1 -> t_id
+          | 2 -> condtc
+          | 3 ->    EcPhlBdHoare.t_hoare_bd_hoare
+                 @! EcPhlTAuto.t_hoare_true
+                 @! t_close t_trivial
+          | 4 -> t_close t_trivial
+          | _ -> t_id)
 
 (* -------------------------------------------------------------------- *)
 let t_lossless_r tc =
