@@ -30,7 +30,7 @@ let t_hoare_bd_hoare tc =
     else
       FApi.t_seqsub
         (t_bdHoareF_conseq_bd FHeq f_r0)
-        [FApi.t_try t_trivial; t_hoare_of_bdhoareF]
+        [FApi.t_try EcPhlAuto.t_pl_trivial; t_hoare_of_bdhoareF]
         tc
 
   | FbdHoareS bhs ->
@@ -39,7 +39,7 @@ let t_hoare_bd_hoare tc =
     else
       FApi.t_seqsub
         (t_bdHoareS_conseq_bd FHeq f_r0)
-        [FApi.t_try t_trivial; t_hoare_of_bdhoareS]
+        [FApi.t_try EcPhlAuto.t_pl_trivial; t_hoare_of_bdhoareS]
         tc
 
   | FhoareF _ -> t_bdhoare_of_hoareF tc
