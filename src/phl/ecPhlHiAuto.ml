@@ -41,6 +41,9 @@ and ll_strategy_of_instr (i : instr) =
   | _ -> LL_JUMP
 
 (* -------------------------------------------------------------------- *)
+let ll_trivial = EcPhlAuto.t_pl_trivial ~bases:["random"]
+
+(* -------------------------------------------------------------------- *)
 let rec apply_ll_strategy (lls : ll_strategy list) tc =
   match lls with
   | [] ->
@@ -58,7 +61,7 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
   | LL_RND ->
          EcPhlRnd.t_bdhoare_rnd PNoRndParams
       @> EcPhlConseq.t_bdHoareS_conseq f_true f_true
-      @~ FApi.t_on1 (-1) ~ttout:t_pl_trivial t_id
+      @~ FApi.t_on1 (-1) ~ttout:ll_trivial t_id
 
   | LL_CALL ->
          EcPhlCall.t_bdhoare_call f_true f_true None
@@ -102,12 +105,12 @@ let t_lossless1_r tc =
 
   let tactic =
     (EcPhlConseq.t_bdHoareS_conseq f_true f_true
-        @~ FApi.t_on1 (-1) ~ttout:t_pl_trivial
+        @~ FApi.t_on1 (-1) ~ttout:ll_trivial
              (EcPhlConseq.t_bdHoareS_conseq_bd FHeq f_r1))
-        @~ FApi.t_on1 (-1) ~ttout:t_pl_trivial
+        @~ FApi.t_on1 (-1) ~ttout:ll_trivial
              tt
 
-  in FApi.t_onall t_pl_trivial (tactic tc)
+  in FApi.t_onall ll_trivial (tactic tc)
 
 (* -------------------------------------------------------------------- *)
 let t_lossless_r =
