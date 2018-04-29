@@ -1013,6 +1013,15 @@ qident_or_res_or_glob:
 | x=loc(RES) { GVvar (mk_loc x.pl_loc ([], "res")) }
 | GLOB mp=loc(mod_qident) { GVglob mp }
 
+pffilter:
+| LBRACKET flat=boption(SLASH)
+    rg=plist0(
+      i=sword? COLON j=sword? { (i, j) }
+    | i=sword                 { (Some i, Some i) }, COMMA)
+  RBRACKET
+
+  { PFRange (flat, rg) }
+
 sform_u(P):
 | x=P
    { x }
@@ -1031,6 +1040,9 @@ sform_u(P):
          parse_error p.pl_loc (Some "invalid scope name");
        PFscope (pqsymb_of_symb p.pl_loc "<top>", f)
      end }
+
+| SHARP pf=pffilter* x=ident
+   { PFref (x, pf) }
 
 | n=uint
    { PFint n }

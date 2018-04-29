@@ -240,6 +240,7 @@ and pformula_r =
   | PFint    of zint
   | PFtuple  of pformula list
   | PFident  of pqsymbol * ptyannot option
+  | PFref    of psymbol * pffilter list
   | PFmem    of psymbol
   | PFside   of pformula * symbol located
   | PFapp    of pformula * pformula list
@@ -270,6 +271,9 @@ and pgty =
 | PGTY_Type  of pty
 | PGTY_ModTy of pmodule_type_restr
 | PGTY_Mem
+
+and pffilter =
+| PFRange of bool * (int option pair) list
 
 (* -------------------------------------------------------------------- *)
 let rec pf_ident ?(raw = false) f =
