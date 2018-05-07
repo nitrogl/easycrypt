@@ -1017,7 +1017,7 @@ pffilter:
 | LBRACKET flat=boption(SLASH)
     rg=plist0(
       i=sword? COLON j=sword? { (i, j) }
-    | i=sword                 { (Some i, Some i) }, COMMA)
+    | i=sword                 { (Some i, None) }, COMMA)
   RBRACKET
 
   { PFRange (flat, rg) }
