@@ -2143,7 +2143,33 @@ let trans_form_or_pattern env ?mv ?ps ue pf tt =
     | PFref ({ pl_desc = name; pl_loc = loc }, filters) -> begin
         match Msym.find_opt name (odfl Msym.empty mv) with
         | None   -> tyerror loc env (UnknownMetaVar name)
-        | Some f -> f           (* FIXME: refresh *)
+        | Some f ->             (* FIXME: refresh *)
+            let rec flatten deep f =
+              try
+                let (f1, f2) = EcFol.destr_and f in
+                (if deep then flatten deep f1 else [f1]) @ (flatten deep f2)
+              with DestrError _ -> [f] in
+
+            let filter1 (fs : form list) (i, j) =
+              let n = List.length fs in
+              let norm k = if k mod n < 0 then k mod n + n else k in
+
+              match
+                match i, j with
+                | None  , None   -> `Range  (0, n)
+                | Some i, None   -> `Single (norm i)
+                | None  , Some j -> `Single (norm j)
+                | Some i, Some j -> `Range  (norm i, norm j)
+              with
+              | `Single k        -> [List.nth fs k]
+              | `Range  (k1, k2) -> List.take (k2 - k1) (List.drop k1 fs) in
+
+            let filter f (PFRange (deep, rgs)) =
+              let f = flatten deep f in
+              let f = List.map (filter1 f) rgs in
+              f_ands (List.flatten f) in
+
+            List.fold_left filter f filters
     end
 
     | PFmem _ -> tyerror f.pl_loc env MemNotAllowed
