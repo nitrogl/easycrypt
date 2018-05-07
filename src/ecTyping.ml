@@ -77,6 +77,7 @@ type tyerror =
 | UnknownTypeClass       of qsymbol
 | UnknownRecFieldName    of qsymbol
 | UnknownInstrMetaVar    of symbol
+| UnknownMetaVar         of symbol
 | DuplicatedRecFieldName of symbol
 | MissingRecField        of symbol
 | MixingRecFields        of EcPath.path tuple2
@@ -135,6 +136,7 @@ exception RestrictionError of EcEnv.env * restriction_error
 
 (* -------------------------------------------------------------------- *)
 type ptnmap = ty EcIdent.Mid.t ref
+type metavs = EcFol.form Msym.t
 
 (* -------------------------------------------------------------------- *)
 let ident_of_osymbol x =
@@ -2122,7 +2124,7 @@ let trans_gbinding env ue decl =
   in snd_map List.flatten (List.map_fold trans1 env decl)
 
 (* -------------------------------------------------------------------- *)
-let trans_form_or_pattern env (ps, ue) pf tt =
+let trans_form_or_pattern env ?mv ?ps ue pf tt =
   let state = PFS.create () in
 
   let rec transf_r opsc env f =
@@ -2136,6 +2138,12 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let x  = EcIdent.create (Printf.sprintf "?%d" (EcUid.unique ())) in
         let ty = UE.fresh ue in
           ps := Mid.add x ty !ps; f_local x ty
+    end
+
+    | PFref ({ pl_desc = name; pl_loc = loc }, filters) -> begin
+        match Msym.find_opt name (odfl Msym.empty mv) with
+        | None   -> tyerror loc env (UnknownMetaVar name)
+        | Some f -> f           (* FIXME: refresh *)
     end
 
     | PFmem _ -> tyerror f.pl_loc env MemNotAllowed
@@ -2472,20 +2480,20 @@ let trans_form_or_pattern env (ps, ue) pf tt =
   f
 
 (* -------------------------------------------------------------------- *)
-let trans_form_opt env ue pf oty =
-  trans_form_or_pattern env (None, ue) pf oty
+let trans_form_opt env ?mv ue pf oty =
+  trans_form_or_pattern env ?mv ue pf oty
 
 (* -------------------------------------------------------------------- *)
-let trans_form env ue pf ty =
-  trans_form_opt env ue pf (Some ty)
+let trans_form env ?mv ue pf ty =
+  trans_form_opt env ?mv ue pf (Some ty)
 
 (* -------------------------------------------------------------------- *)
-let trans_prop env ue pf =
-  trans_form env ue pf tbool
+let trans_prop env ?mv ue pf =
+  trans_form env ?mv ue pf tbool
 
 (* -------------------------------------------------------------------- *)
-let trans_pattern env (ps, ue) pf =
-  trans_form_or_pattern env (Some ps, ue) pf None
+let trans_pattern env ps ue pf =
+  trans_form_or_pattern env ~ps ue pf None
 
 (* -------------------------------------------------------------------- *)
 let get_instances (tvi, bty) env =
