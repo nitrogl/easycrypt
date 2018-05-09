@@ -2144,12 +2144,6 @@ let trans_form_or_pattern env ?mv ?ps ue pf tt =
         match Msym.find_opt name (odfl Msym.empty mv) with
         | None   -> tyerror loc env (UnknownMetaVar name)
         | Some f ->             (* FIXME: refresh *)
-            let rec flatten deep f =
-              try
-                let (f1, f2) = EcFol.destr_and f in
-                (if deep then flatten deep f1 else [f1]) @ (flatten deep f2)
-              with DestrError _ -> [f] in
-
             let filter1 (fs : form list) (i, j) =
               let n = List.length fs in
               let norm k = if k mod n < 0 then k mod n + n else k in
@@ -2165,7 +2159,7 @@ let trans_form_or_pattern env ?mv ?ps ue pf tt =
               | `Range  (k1, k2) -> List.take (k2 - k1) (List.drop k1 fs) in
 
             let filter f (PFRange (deep, rgs)) =
-              let f = flatten deep f in
+              let f = EcFol.destr_ands ~deep f in
               let f = List.map (filter1 f) rgs in
               f_ands (List.flatten f) in
 
