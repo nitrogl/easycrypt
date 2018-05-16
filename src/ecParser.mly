@@ -431,6 +431,7 @@
 %token FINAL
 %token FIRST
 %token FISSION
+%token FOR
 %token FORALL
 %token FUN
 %token FUSION
@@ -1021,6 +1022,14 @@ pffilter:
   RBRACKET
 
   { PFRange (flat, rg) }
+
+| LBRACKET x=ident IN h=form_h RBRACKET
+
+  { PFMatch (x, h) }
+
+| LBRACKET f=form FOR xs=plist1(ident, COMMA) IN h=form_h RBRACKET
+
+  { PFMatchBuild (xs, f, h) }
 
 sform_u(P):
 | x=P

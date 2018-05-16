@@ -273,7 +273,9 @@ and pgty =
 | PGTY_Mem
 
 and pffilter =
-| PFRange of bool * (int option pair) list
+| PFRange      of bool * (int option pair) list
+| PFMatch      of psymbol * pformula
+| PFMatchBuild of psymbol list * pformula * pformula
 
 (* -------------------------------------------------------------------- *)
 let rec pf_ident ?(raw = false) f =

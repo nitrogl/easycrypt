@@ -113,6 +113,7 @@ type tyerror =
 | PatternNotAllowed
 | MemNotAllowed
 | UnknownScope           of qsymbol
+| FilterMatchFailure
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -2124,7 +2125,7 @@ let trans_gbinding env ue decl =
   in snd_map List.flatten (List.map_fold trans1 env decl)
 
 (* -------------------------------------------------------------------- *)
-let trans_form_or_pattern env ?mv ?ps ue pf tt =
+let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
   let state = PFS.create () in
 
   let rec transf_r opsc env f =
@@ -2137,7 +2138,7 @@ let trans_form_or_pattern env ?mv ?ps ue pf tt =
       | Some ps ->
         let x  = EcIdent.create (Printf.sprintf "?%d" (EcUid.unique ())) in
         let ty = UE.fresh ue in
-          ps := Mid.add x ty !ps; f_local x ty
+        ps := Mid.add x ty !ps; f_local x ty
     end
 
     | PFref ({ pl_desc = name; pl_loc = loc }, filters) -> begin
@@ -2164,12 +2165,52 @@ let trans_form_or_pattern env ?mv ?ps ue pf tt =
               | `Single k        -> [List.nth fs k]
               | `Range  (k1, k2) -> List.take (k2 - k1) (List.drop k1 fs) in
 
-            let filter f (PFRange (deep, rgs)) =
-              let f = flatten deep f in
-              let f = List.map (filter1 f) rgs in
-              f_ands (List.flatten f) in
+            let filter f pf =
+              match pf with
+              | PFRange (deep, rgs) ->
+                  let f = flatten deep f in
+                  let f = List.map (filter1 f) rgs in
+                  f_ands (List.flatten f)
 
-            List.fold_left filter f filters
+              | PFMatch (x, ppt) ->
+                  let x    = EcIdent.create (unloc x) in
+                  let lenv = EcEnv.Var.bind_local x tbool env in
+                  let ps   = ref Mid.empty in
+                  let ue   = EcUnify.UniEnv.create None in
+                  let pt   = trans_pattern lenv ps ue ppt in
+                  let ev   = EcMatching.MEV.of_idents (x :: Mid.keys !ps) `Form in
+                  let mode = EcMatching.fmrigid in
+                  let hyps = EcEnv.LDecl.init lenv [] in
+
+                  let (ue, _, ev) =
+                    try  EcMatching.f_match mode hyps (ue, ev) ~ptn:pt f
+                    with EcMatching.MatchFailure ->
+                      tyerror ppt.pl_loc env FilterMatchFailure in
+
+                  let subst = EcMatching.MEV.assubst ue ev in
+                  Fsubst.f_subst subst (f_local x tbool)
+
+              | PFMatchBuild (xs, ptg, ppt) ->
+                  let xs   = List.map (EcIdent.create |- unloc) xs in
+                  let xst  = List.map (fun x -> (x, tbool)) xs in
+                  let lenv = EcEnv.Var.bind_locals xst env in
+                  let tg   = trans_prop lenv ue ptg in
+                  let ps   = ref Mid.empty in
+                  let ue   = EcUnify.UniEnv.create None in
+                  let pt   = trans_pattern lenv ps ue ppt in
+                  let ev   = EcMatching.MEV.of_idents (xs @ Mid.keys !ps) `Form in
+                  let mode = EcMatching.fmrigid in
+                  let hyps = EcEnv.LDecl.init lenv [] in
+
+                  let (ue, _, ev) =
+                    try  EcMatching.f_match mode hyps (ue, ev) ~ptn:pt f
+                    with EcMatching.MatchFailure ->
+                      tyerror ppt.pl_loc env FilterMatchFailure in
+
+                  let subst = EcMatching.MEV.assubst ue ev in
+                  Fsubst.f_subst subst tg
+
+            in List.fold_left filter f filters
     end
 
     | PFmem _ -> tyerror f.pl_loc env MemNotAllowed
@@ -2506,19 +2547,19 @@ let trans_form_or_pattern env ?mv ?ps ue pf tt =
   f
 
 (* -------------------------------------------------------------------- *)
-let trans_form_opt env ?mv ue pf oty =
+and trans_form_opt env ?mv ue pf oty =
   trans_form_or_pattern env ?mv ue pf oty
 
 (* -------------------------------------------------------------------- *)
-let trans_form env ?mv ue pf ty =
+and trans_form env ?mv ue pf ty =
   trans_form_opt env ?mv ue pf (Some ty)
 
 (* -------------------------------------------------------------------- *)
-let trans_prop env ?mv ue pf =
+and trans_prop env ?mv ue pf =
   trans_form env ?mv ue pf tbool
 
 (* -------------------------------------------------------------------- *)
-let trans_pattern env ps ue pf =
+and trans_pattern env ps ue pf =
   trans_form_or_pattern env ~ps ue pf None
 
 (* -------------------------------------------------------------------- *)
