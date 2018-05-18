@@ -2744,6 +2744,8 @@ phltactic:
 | CONSEQ cq=cqoptions? UNDERSCORE UNDERSCORE info3=gpterm(conseq_bd)
     { Pconseq (odfl [] cq, (None,None,Some info3)) }
 
+| CONSEQ SLASHGT { Pconseqauto }
+
 | ELIM STAR
     { Phrex_elim }
 
