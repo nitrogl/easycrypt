@@ -1101,9 +1101,9 @@ let t_conseqauto tc =
     let tc' =
       FApi.t_seqs
         [my_intros_i ms bdm;
-         t_crush_post 1;
+         t_crush_post ~delta:false 1;
          my_intros_i other (List.map fst bdo);
-         t_crush ] tc' in
+         t_crush ~delta:false ] tc' in
     let post =
       if FApi.tc_done tc' then f_true
       else
