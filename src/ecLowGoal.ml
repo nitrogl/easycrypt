@@ -1388,7 +1388,7 @@ type rwmode = [`Bool | `Eq]
 
 (* -------------------------------------------------------------------- *)
 let t_rewrite
-  ?xconv ?target ?(mode : rwmode option) (pt : proofterm)
+  ?xconv ?target ?(mode : rwmode option) ?(donot=false)(pt : proofterm)
     (s, pos) (tc : tcenv1)
 =
   let tc           = RApi.rtcenv_of_tcenv1 tc in
@@ -1396,15 +1396,24 @@ let t_rewrite
   let env          = LDecl.toenv hyps in
   let (pt, ax)     = LowApply.check `Elim pt (`Tc (tc, target)) in
 
-  let (left, right) =
+  let (pt, left, right) =
     let doit ax =
       match sform_of_form ax, mode with
-      | SFeq  (f1, f2), (None | Some `Eq) -> (f1, f2)
-      | SFiff (f1, f2), (None | Some `Eq) -> (f1, f2)
+      | SFeq  (f1, f2), (None | Some `Eq) -> (pt, f1, f2)
+      | SFiff (f1, f2), (None | Some `Eq) -> (pt, f1, f2)
+
+      | SFnot f, (None | Some `Bool) when s = `LtoR && donot ->
+        let ptev_env = ptenv_of_penv hyps (RApi.tc_penv tc) in
+        let pt = { ptev_env; ptev_pt = pt; ptev_ax = ax } in
+        let pt' = pt_of_global_r ptev_env LG.p_negeqF [] in
+        let pt' = apply_pterm_to_arg_r pt' (PVAFormula f) in
+        let pt' = apply_pterm_to_arg_r pt' (PVASub pt) in
+        let pt, _ = concretize pt' in
+        pt, f, f_false
 
       | _, (None | Some `Bool) when
           s = `LtoR && ER.EqTest.for_type env ax.f_ty tbool
-          -> (ax, f_true)
+          -> (pt, ax, f_true)
 
       | _ -> raise TTC.NoMatch
     in oget ~exn:InvalidProofTerm (TTC.lazy_destruct hyps doit ax)
@@ -1448,9 +1457,9 @@ let t_rewrite
       RApi.tcenv_of_rtcenv tc
 
 (* -------------------------------------------------------------------- *)
-let t_rewrite_hyp ?xconv ?mode (id : EcIdent.t) pos (tc : tcenv1) =
+let t_rewrite_hyp ?xconv ?mode ?donot (id : EcIdent.t) pos (tc : tcenv1) =
   let pt = { pt_head = PTLocal id; pt_args = []; } in
-  t_rewrite ?xconv ?mode pt pos tc
+  t_rewrite ?xconv ?mode ?donot pt pos tc
 
 (* -------------------------------------------------------------------- *)
 type vsubst = [
@@ -1963,7 +1972,9 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
           let st = { st with cs_sbeq = st.cs_sbeq |> omap (Sid.add id); } in
           let tc = FApi.as_tcenv1 tc in
           let tc =
-            let rw = t_rewrite_hyp ~xconv:`AlphaEq ~mode:`Bool id (`LtoR, None) in
+            let rw =
+              t_rewrite_hyp ~xconv:`AlphaEq ~mode:`Bool ~donot:true
+                id (`LtoR, None) in
             (    FApi.t_try (t_absurd_hyp ~conv:`AlphaEq ~id)
               @! FApi.t_try (FApi.t_seq (FApi.t_try rw) tt)
               @! t_generalize_hyp ~clear:`Yes id) tc
@@ -2165,7 +2176,9 @@ let t_crush_post ?(delta = true) nb_intros (tc : tcenv1) =
       | tc ->
         let tc = FApi.as_tcenv1 tc in
         let tc =
-          let rw = t_rewrite_hyp ~xconv:`AlphaEq ~mode:`Bool id (`LtoR, None) in
+          let rw =
+            t_rewrite_hyp ~xconv:`AlphaEq ~mode:`Bool ~donot:true
+              id (`LtoR, None) in
             (    FApi.t_try (t_absurd_hyp ~conv:`AlphaEq ~id)
               @! FApi.t_try (FApi.t_seq (FApi.t_try rw) tt)
               @! t_generalize_hyp ~clear:`Yes id) tc

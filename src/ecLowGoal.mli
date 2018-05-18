@@ -195,11 +195,11 @@ type rwspec = [`LtoR|`RtoL] * ptnpos option
 type rwmode = [`Bool | `Eq]
 
 val t_rewrite :
-     ?xconv:xconv -> ?target:ident -> ?mode:rwmode
+     ?xconv:xconv -> ?target:ident -> ?mode:rwmode -> ?donot:bool
   -> proofterm -> rwspec -> FApi.backward
 
 val t_rewrite_hyp :
-     ?xconv:xconv -> ?mode:rwmode -> EcIdent.t
+     ?xconv:xconv -> ?mode:rwmode -> ?donot:bool -> EcIdent.t
   -> rwspec -> FApi.backward
 
 type tside = [`All of [`LtoR | `RtoL] option | `LtoR | `RtoL]
