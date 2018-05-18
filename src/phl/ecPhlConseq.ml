@@ -1067,7 +1067,7 @@ let process_conseq_opt cqopt infos tc =
 
 (* -------------------------------------------------------------------- *)
 
-let t_conseqauto tc =
+let t_conseqauto ?(delta=true) ?tsolve tc =
   let hyps = FApi.tc1_hyps tc in
   let concl = FApi.tc1_goal tc in
   let mk_other = true in
@@ -1101,9 +1101,9 @@ let t_conseqauto tc =
     let tc' =
       FApi.t_seqs
         [my_intros_i ms bdm;
-         t_crush_post ~delta:false 1;
+         t_crush_post ~delta 1;
          my_intros_i other (List.map fst bdo);
-         t_crush ~delta:false ] tc' in
+         t_crush ~delta ?tsolve ] tc' in
     let post =
       if FApi.tc_done tc' then f_true
       else
@@ -1113,5 +1113,5 @@ let t_conseqauto tc =
         let s = List.fold_left2 Fsubst.f_bind_mem s ms bdm in
         let s = List.fold_left2 Fsubst.f_bind_local s other (List.map snd bdo) in
         Fsubst.f_subst s concl in
-    let t_end = FApi.t_try (t_crush @! t_fail) in
+    let t_end = FApi.t_try (t_crush ~delta ?tsolve @! t_fail) in
     FApi.t_first t_end (t_notmod post tc)
