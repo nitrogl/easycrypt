@@ -2121,24 +2121,23 @@ let t_auto ?(bases = [EcEnv.Auto.dname]) ?(depth = 1) (tc : tcenv1) =
 (* --------------------------------------------------------------------- *)
 
 type cpstate = {
-   cs_sbeq : Sid.t option;
    nb_intros : int;
 }
 
 let t_crush_post ?(delta = true) nb_intros (tc : tcenv1) =
 
-  let t_progress_subst ?(tg : Sid.t option) ?eqid =
+  let t_progress_subst ?eqid =
     let sk1 = { empty_subst_kind with sk_local = true ; } in
     let sk2 = {  full_subst_kind with sk_local = false; } in
     FApi.t_or
-      (t_subst ?tg ~clear:false ~kind:sk1 ?eqid)
-      (t_subst ?tg ~clear:false ~kind:sk2 ?eqid)
+      (t_subst ~clear:false ~kind:sk1 ?eqid)
+      (t_subst ~clear:false ~kind:sk2 ?eqid)
   in
 
   let tt = FApi.t_try (t_assumption `Alpha) in
 
-  let ts ?tg id =
-    FApi.t_try (t_progress_subst ?tg ~eqid:id) in
+  let ts id =
+    FApi.t_try (t_progress_subst ~eqid:id) in
 
   (* Entry of progress: simplify goal, and chain with progress *)
   let rec entry (st : cpstate) tc =
@@ -2161,7 +2160,6 @@ let t_crush_post ?(delta = true) nb_intros (tc : tcenv1) =
       match t_intros_i_seq [id] tt tc with
       | tc when FApi.tc_done tc -> tc
       | tc ->
-        let st = { st with cs_sbeq = st.cs_sbeq |> omap (Sid.add id); } in
         let tc = FApi.as_tcenv1 tc in
         let tc =
           let rw = t_rewrite_hyp ~xconv:`AlphaEq ~mode:`Bool id (`LtoR, None) in
@@ -2172,7 +2170,7 @@ let t_crush_post ?(delta = true) nb_intros (tc : tcenv1) =
 
         let incr st i = {st with nb_intros = st.nb_intros + i - 1 } in
         let iffail tc =
-          (t_intros_i_seq [id] (ts ?tg:st.cs_sbeq id) @!
+          (t_intros_i_seq [id] (ts id) @!
            entry (incr st 0)) tc
         in
 
@@ -2205,5 +2203,5 @@ let t_crush_post ?(delta = true) nb_intros (tc : tcenv1) =
     | _ -> t_fail tc
   in
 
-  let state = { nb_intros; cs_sbeq = None; } in
+  let state = { nb_intros } in
   FApi.t_seq (entry state) (t_simplify_with_info EcReduction.nodelta) tc

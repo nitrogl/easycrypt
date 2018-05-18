@@ -160,7 +160,12 @@ let t_conseq pre post tc =
   | _           -> tc_error_noXhl !!tc
 
 (* -------------------------------------------------------------------- *)
-let t_equivF_notmod post tc =
+let mk_bind_pvar m (id,_) (x, ty) = id, f_pvar x ty m
+let mk_bind_glob m (id,_) x  = id, f_glob x m
+let mk_bind_pvars m (bd1,bd2) = List.map2 (mk_bind_pvar m) bd1 bd2
+let mk_bind_globs m (bd1,bd2) = List.map2 (mk_bind_glob m) bd1 bd2
+
+let cond_equivF_notmod ?(mk_other=false) tc cond =
   let (env, hyps, _) = FApi.tc1_eflat tc in
   let ef = tc1_as_equivF tc in
   let fl, fr = ef.ef_fl, ef.ef_fr in
@@ -174,37 +179,59 @@ let t_equivF_notmod post tc =
   let fresr = f_local vresr fsigr.fs_ret in
   let ml, mr = fst mpol, fst mpor in
   let s = PVM.add env pvresl ml fresl (PVM.add env pvresr mr fresr PVM.empty) in
-  let cond = f_imp post ef.ef_po in
   let cond = PVM.subst env s cond in
   let modil, modir = f_write env fl, f_write env fr in
-  let cond = generalize_mod env mr modir cond in
-  let cond = generalize_mod env ml modil cond in
+  let cond, bdgr, bder = generalize_mod_ env mr modir cond in
+  let cond, bdgl, bdel = generalize_mod_ env ml modil cond in
   let cond =
     f_forall_simpl
       [(vresl, GTty fsigl.fs_ret);
        (vresr, GTty fsigr.fs_ret)]
       cond in
   assert (fst mprl = ml && fst mprr = mr);
-  let cond1 = f_forall_mems [mprl; mprr] (f_imp ef.ef_pr cond) in
-  let cond2 = f_equivF ef.ef_pr fl fr post in
+  let cond = f_forall_mems [mprl; mprr] (f_imp ef.ef_pr cond) in
+  let bmem = [ml;mr] in
+  let bother =
+    if mk_other then
+      mk_bind_pvar ml (vresl,()) (pvresl, fsigl.fs_ret) ::
+      mk_bind_pvar mr (vresr,()) (pvresr, fsigr.fs_ret) ::
+      List.flatten [mk_bind_globs ml bdgl; mk_bind_pvars ml bdel;
+                    mk_bind_globs mr bdgr; mk_bind_pvars mr bder]
+    else [] in
+  cond, bmem, bother
+
+let t_equivF_notmod post tc =
+  let ef = tc1_as_equivF tc in
+  let cond1, _, _ = cond_equivF_notmod tc (f_imp post ef.ef_po) in
+  let cond2 = f_equivF_r {ef with ef_po = post } in
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
-let t_equivS_notmod post tc =
+let cond_equivS_notmod ?(mk_other=false) tc cond =
   let env = FApi.tc1_env tc in
   let es = tc1_as_equivS tc in
   let sl, sr = es.es_sl, es.es_sr in
   let ml, mr = fst es.es_ml, fst es.es_mr in
-  let cond = f_imp post es.es_po in
   let modil, modir = s_write env sl, s_write env sr in
-  let cond = generalize_mod env mr modir cond in
-  let cond = generalize_mod env ml modil cond in
-  let cond1 = f_forall_mems [es.es_ml; es.es_mr] (f_imp es.es_pr cond) in
+  let cond, bdgr, bder = generalize_mod_ env mr modir cond in
+  let cond, bdgl, bdel = generalize_mod_ env ml modil cond in
+  let cond = f_forall_mems [es.es_ml; es.es_mr] (f_imp es.es_pr cond) in
+  let bmem = [ml;mr] in
+  let bother =
+    if mk_other then
+      List.flatten [mk_bind_globs ml bdgl; mk_bind_pvars ml bdel;
+                    mk_bind_globs mr bdgr; mk_bind_pvars mr bder]
+    else [] in
+  cond, bmem, bother
+
+let t_equivS_notmod post tc =
+  let es = tc1_as_equivS tc in
+  let cond1,_,_ = cond_equivS_notmod tc (f_imp post es.es_po) in
   let cond2 = f_equivS_r {es with es_po = post} in
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
-let t_hoareF_notmod post tc =
+let cond_hoareF_notmod ?(mk_other=false) tc cond =
   let (env, hyps, _) = FApi.tc1_eflat tc in
   let hf = tc1_as_hoareF tc in
   let f = hf.hf_f in
@@ -215,31 +242,50 @@ let t_hoareF_notmod post tc =
   let fres = f_local vres fsig.fs_ret in
   let m    = fst mpo in
   let s = PVM.add env pvres m fres PVM.empty in
-  let cond = f_imp post hf.hf_po in
   let cond = PVM.subst env s cond in
   let modi = f_write env f in
-  let cond = generalize_mod env m modi cond in
+  let cond,bdg,bde = generalize_mod_ env m modi cond in
   let cond = f_forall_simpl [(vres, GTty fsig.fs_ret)] cond in
   assert (fst mpr = m);
-  let cond1 = f_forall_mems [mpr] (f_imp hf.hf_pr cond) in
-  let cond2 = f_hoareF hf.hf_pr f post in
+  let cond = f_forall_mems [mpr] (f_imp hf.hf_pr cond) in
+  let bmem = [m] in
+  let bother =
+    if mk_other then
+      mk_bind_pvar m (vres,()) (pvres, fsig.fs_ret) ::
+      List.flatten [mk_bind_globs m bdg; mk_bind_pvars m bde]
+    else [] in
+  cond, bmem, bother
+
+let t_hoareF_notmod post tc =
+  let hf = tc1_as_hoareF tc in
+  let cond1, _, _ = cond_hoareF_notmod tc (f_imp post hf.hf_po) in
+  let cond2 = f_hoareF_r { hf with hf_po = post } in
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
-let t_hoareS_notmod post tc =
+let cond_hoareS_notmod ?(mk_other=false) tc cond =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
   let s = hs.hs_s in
   let m = fst hs.hs_m in
-  let cond = f_imp post hs.hs_po in
   let modi = s_write env s in
-  let cond = generalize_mod env m modi cond in
-  let cond1 = f_forall_mems [hs.hs_m] (f_imp hs.hs_pr cond) in
+  let cond, bdg, bde = generalize_mod_ env m modi cond in
+  let cond = f_forall_mems [hs.hs_m] (f_imp hs.hs_pr cond) in
+  let bmem = [m] in
+  let bother =
+    if mk_other then
+      List.flatten [mk_bind_globs m bdg; mk_bind_pvars m bde]
+    else [] in
+  cond, bmem, bother
+
+let t_hoareS_notmod post tc =
+  let hs = tc1_as_hoareS tc in
+  let cond1, _, _ = cond_hoareS_notmod tc (f_imp post hs.hs_po) in
   let cond2 = f_hoareS_r {hs with hs_po = post} in
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
-let t_bdHoareF_notmod post tc =
+let cond_bdHoareF_notmod ?(mk_other=false) tc cond =
   let (env, hyps, _) = FApi.tc1_eflat tc in
   let hf = tc1_as_bdhoareF tc in
   let f = hf.bhf_f in
@@ -250,28 +296,50 @@ let t_bdHoareF_notmod post tc =
   let fres = f_local vres fsig.fs_ret in
   let m    = fst mpo in
   let s = PVM.add env pvres m fres PVM.empty in
-  let _, cond =
-    bdHoare_conseq_conds hf.bhf_cmp hf.bhf_pr hf.bhf_po hf.bhf_pr post in
   let cond = PVM.subst env s cond in
   let modi = f_write env f in
-  let cond = generalize_mod env m modi cond in
+  let cond, bdg, bde = generalize_mod_ env m modi cond in
   let cond = f_forall_simpl [(vres, GTty fsig.fs_ret)] cond in
   assert (fst mpr = m);
-  let cond1 = f_forall_mems [mpr] (f_imp hf.bhf_pr cond) in
-  let cond2 = f_bdHoareF hf.bhf_pr f post hf.bhf_cmp hf.bhf_bd in
+  let cond = f_forall_mems [mpr] (f_imp hf.bhf_pr cond) in
+  let bmem = [m] in
+  let bother =
+    if mk_other then
+      mk_bind_pvar m (vres,()) (pvres, fsig.fs_ret) ::
+      List.flatten [mk_bind_globs m bdg; mk_bind_pvars m bde]
+    else [] in
+  cond, bmem, bother
+
+
+let t_bdHoareF_notmod post tc =
+  let hf = tc1_as_bdhoareF tc in
+  let _, cond =
+    bdHoare_conseq_conds hf.bhf_cmp hf.bhf_pr hf.bhf_po hf.bhf_pr post in
+  let cond1, _, _ = cond_bdHoareF_notmod tc cond in
+  let cond2 = f_bdHoareF_r {hf with bhf_po = post} in
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
-let t_bdHoareS_notmod post tc =
+let cond_bdHoareS_notmod ?(mk_other=false) tc cond =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_bdhoareS tc in
   let s = hs.bhs_s in
   let m = fst hs.bhs_m in
+  let modi = s_write env s in
+  let cond, bdg, bde = generalize_mod_ env m modi cond in
+  let cond = f_forall_mems [hs.bhs_m] (f_imp hs.bhs_pr cond) in
+  let bmem = [m] in
+  let bother =
+    if mk_other then
+      List.flatten [mk_bind_globs m bdg; mk_bind_pvars m bde]
+    else [] in
+  cond, bmem, bother
+
+let t_bdHoareS_notmod post tc =
+  let hs = tc1_as_bdhoareS tc in
   let _, cond =
     bdHoare_conseq_conds hs.bhs_cmp hs.bhs_pr hs.bhs_po hs.bhs_pr post in
-  let modi = s_write env s in
-  let cond = generalize_mod env m modi cond in
-  let cond1 = f_forall_mems [hs.bhs_m] (f_imp hs.bhs_pr cond) in
+  let cond1, _, _ = cond_bdHoareS_notmod tc cond in
   let cond2 = f_bdHoareS_r {hs with bhs_po = post} in
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
@@ -998,51 +1066,52 @@ let process_conseq_opt cqopt infos tc =
   process_conseq cqopt.cqo_frame infos tc
 
 (* -------------------------------------------------------------------- *)
+
 let t_conseqauto tc =
-  let env,hyps,_ = FApi.tc1_eflat tc in
-  let es = tc1_as_equivS tc in
-  let sl, sr = es.es_sl, es.es_sr in
-  let ml, mr = fst es.es_ml, fst es.es_mr in
-  let modil, modir = s_write env sl, s_write env sr in
-  let cond, bdgr, bder = generalize_mod_ env mr modir es.es_po in
-  let cond, bdgl, bdel = generalize_mod_ env ml modil cond in
-  let cond = f_forall_mems [es.es_ml; es.es_mr] (f_imp es.es_pr cond) in
-  let tc' = EcCoreGoal.tcenv1_of_proof( EcCoreGoal.start hyps cond) in
-  let allbd = List.flatten [fst bdgl; fst bdel; fst bdgr; fst bder] in
-  let allid = List.map fst allbd in
-  let alln = List.map EcIdent.name allid in
-  let ids =  EcEnv.LDecl.fresh_ids hyps ("&m1":: "&m2"::alln) in
-  let m1, m2, idgl, idel, idgr, ider =
-    match ids with
-    | m1::m2::others ->
-      let idgl,others = List.split_at (List.length (fst bdgl)) others in
-      let idel,others = List.split_at (List.length (fst bdel)) others in
-      let idgr,others = List.split_at (List.length (fst bdgr)) others in
-      let ider,others = List.split_at (List.length (fst bder)) others in
-      assert (others = []);
-      m1, m2, idgl, idel, idgr, ider
-    | _ -> assert false in
-  let tc' =
-    FApi.t_seqs
-      [t_intros_i [m1; m2];
-       t_crush_post 1;
-       t_intros_i (List.flatten [idgl; idel; idgr; ider]);
-       t_crush ] tc' in
-  let post =
-    if FApi.tc_done tc' then f_true
-    else
-      let concl = FApi.tc_goal tc' in
-      (* Build the inversion substitution *)
-      let s = Fsubst.f_subst_id in
-      let s = Fsubst.f_bind_mem s m1 ml in
-      let s = Fsubst.f_bind_mem s m2 mr in
-      let add_glob m s id g =
-        Fsubst.f_bind_local s id (f_glob g m) in
-      let add_pvar m s id (x,ty) =
-        Fsubst.f_bind_local s id (f_pvar x ty m) in
-      let s = List.fold_left2 (add_glob ml) s idgl (snd bdgl) in
-      let s = List.fold_left2 (add_pvar ml) s idel (snd bdel) in
-      let s = List.fold_left2 (add_glob mr) s idgr (snd bdgr) in
-      let s = List.fold_left2 (add_pvar mr) s ider (snd bder) in
-      Fsubst.f_subst s concl in
-  FApi.t_first t_crush (t_equivS_notmod post tc)
+  let hyps = FApi.tc1_hyps tc in
+  let concl = FApi.tc1_goal tc in
+  let mk_other = true in
+  let todo =
+    match concl.f_node with
+    | FhoareF hf   -> Some (t_hoareF_notmod, cond_hoareF_notmod ~mk_other tc hf.hf_po)
+    | FhoareS hs   -> Some (t_hoareS_notmod, cond_hoareS_notmod ~mk_other tc hs.hs_po )
+    | FbdHoareF hf -> Some (t_bdHoareF_notmod, cond_bdHoareF_notmod ~mk_other tc hf.bhf_po)
+    | FbdHoareS hs -> Some (t_bdHoareS_notmod, cond_bdHoareS_notmod ~mk_other tc hs.bhs_po)
+    | FequivF ef   -> Some (t_equivF_notmod, cond_equivF_notmod ~mk_other tc ef.ef_po)
+    | FequivS es   -> Some (t_equivS_notmod, cond_equivS_notmod ~mk_other tc es.es_po )
+    | _            -> None in
+
+  match todo with
+  | None -> tc_error_noXhl ~kinds:hlkinds_Xhl !!tc
+  | Some (t_notmod, (cond, bdm, bdo)) ->
+    let alln = List.map EcIdent.name (bdm@List.map fst bdo) in
+    let ids = EcEnv.LDecl.fresh_ids hyps alln in
+    let ms, other = List.split_at (List.length bdm) ids in
+    let tc' = EcCoreGoal.tcenv1_of_proof( EcCoreGoal.start hyps cond) in
+    let rec my_intros_i other bdo tc =
+      match other, bdo with
+      | [], [] -> t_id tc
+      | x::other, x'::bdo ->
+        let concl = FApi.tc1_goal tc in
+        let (x1,_,_) = destr_forall1 concl in
+        if EcIdent.id_equal x' x1 then (t_intro_i x @! my_intros_i other bdo) tc
+        else my_intros_i other bdo tc
+      | _,_ -> assert false in
+
+    let tc' =
+      FApi.t_seqs
+        [my_intros_i ms bdm;
+         t_crush_post 1;
+         my_intros_i other (List.map fst bdo);
+         t_crush ] tc' in
+    let post =
+      if FApi.tc_done tc' then f_true
+      else
+        let concl = FApi.tc_goal tc' in
+        (* Build the inversion substitution *)
+        let s = Fsubst.f_subst_id in
+        let s = List.fold_left2 Fsubst.f_bind_mem s ms bdm in
+        let s = List.fold_left2 Fsubst.f_bind_local s other (List.map snd bdo) in
+        Fsubst.f_subst s concl in
+    let t_end = FApi.t_try (t_crush @! t_fail) in
+    FApi.t_first t_end (t_notmod post tc)
