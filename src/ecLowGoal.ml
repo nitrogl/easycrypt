@@ -2089,7 +2089,7 @@ let t_smt ~(mode:smtmode) pi tc =
   else error ()
 
 (* -------------------------------------------------------------------- *)
-let t_auto bases depth tc =
+let t_auto ?(bases = [EcEnv.Auto.dname]) ?(depth = 1) (tc : tcenv1) =
   let module E = struct
       exception Done of tcenv
       exception Fail

@@ -353,8 +353,8 @@ let t_rewrite_prept info pt tc =
   LowRewrite.t_rewrite_r info (pt_of_prept tc pt) tc
 
 (* -------------------------------------------------------------------- *)
-let process_auto ?(bases = [EcEnv.Auto.dname]) ?(depth = 1) (tc : tcenv1) =
-  EcLowGoal.t_auto bases depth tc
+let process_auto ?bases ?depth (tc : tcenv1) =
+  EcLowGoal.t_auto ?bases ?depth tc
 
 (* -------------------------------------------------------------------- *)
 let process_solve ?bases ?depth (tc : tcenv1) =
@@ -366,8 +366,7 @@ let process_solve ?bases ?depth (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let process_trivial (tc : tcenv1) =
-  let subtc = t_seqs [EcPhlAuto.t_phl_trivial; process_auto] in
-  EcLowGoal.t_trivial ~subtc tc
+  EcPhlAuto.t_pl_trivial tc
 
 (* -------------------------------------------------------------------- *)
 let process_done tc =
