@@ -996,3 +996,53 @@ end
 let process_conseq_opt cqopt infos tc =
   let cqopt = CQOptions.merge CQOptions.default cqopt in
   process_conseq cqopt.cqo_frame infos tc
+
+(* -------------------------------------------------------------------- *)
+let t_conseqauto tc =
+  let env,hyps,_ = FApi.tc1_eflat tc in
+  let es = tc1_as_equivS tc in
+  let sl, sr = es.es_sl, es.es_sr in
+  let ml, mr = fst es.es_ml, fst es.es_mr in
+  let modil, modir = s_write env sl, s_write env sr in
+  let cond, bdgr, bder = generalize_mod_ env mr modir es.es_po in
+  let cond, bdgl, bdel = generalize_mod_ env ml modil cond in
+  let cond = f_forall_mems [es.es_ml; es.es_mr] (f_imp es.es_pr cond) in
+  let tc' = EcCoreGoal.tcenv1_of_proof( EcCoreGoal.start hyps cond) in
+  let allbd = List.flatten [fst bdgl; fst bdel; fst bdgr; fst bder] in
+  let allid = List.map fst allbd in
+  let alln = List.map EcIdent.name allid in
+  let ids =  EcEnv.LDecl.fresh_ids hyps ("&m1":: "&m2"::alln) in
+  let m1, m2, idgl, idel, idgr, ider =
+    match ids with
+    | m1::m2::others ->
+      let idgl,others = List.split_at (List.length (fst bdgl)) others in
+      let idel,others = List.split_at (List.length (fst bdel)) others in
+      let idgr,others = List.split_at (List.length (fst bdgr)) others in
+      let ider,others = List.split_at (List.length (fst bder)) others in
+      assert (others = []);
+      m1, m2, idgl, idel, idgr, ider
+    | _ -> assert false in
+  let tc' =
+    FApi.t_seqs
+      [t_intros_i [m1; m2];
+       t_crush_post 1;
+       t_intros_i (List.flatten [idgl; idel; idgr; ider]);
+       t_crush ] tc' in
+  let post =
+    if FApi.tc_done tc' then f_true
+    else
+      let concl = FApi.tc_goal tc' in
+      (* Build the inversion substitution *)
+      let s = Fsubst.f_subst_id in
+      let s = Fsubst.f_bind_mem s m1 ml in
+      let s = Fsubst.f_bind_mem s m2 mr in
+      let add_glob m s id g =
+        Fsubst.f_bind_local s id (f_glob g m) in
+      let add_pvar m s id (x,ty) =
+        Fsubst.f_bind_local s id (f_pvar x ty m) in
+      let s = List.fold_left2 (add_glob ml) s idgl (snd bdgl) in
+      let s = List.fold_left2 (add_pvar ml) s idel (snd bdel) in
+      let s = List.fold_left2 (add_glob mr) s idgr (snd bdgr) in
+      let s = List.fold_left2 (add_pvar mr) s ider (snd bder) in
+      Fsubst.f_subst s concl in
+  FApi.t_first t_crush (t_equivS_notmod post tc)

@@ -300,3 +300,6 @@ val t_smt: mode:smtmode -> prover_infos -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_auto : ?bases:symbol list -> ?depth:int -> FApi.backward
+
+(* -------------------------------------------------------------------- *)
+val t_crush_post : ?delta:bool -> int -> FApi.backward
