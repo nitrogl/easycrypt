@@ -2152,7 +2152,7 @@ let t_crush_post ?(delta = true) nb_intros (tc : tcenv1) =
 
   (* Entry of progress: simplify goal, and chain with progress *)
   let rec entry (st : cpstate) tc =
-    FApi.t_seq (t_simplify ~delta:false) (aux0 st) tc
+   (* FApi.t_seq (t_simplify ~delta:false)*) (aux0 st) tc
 
   and aux0 (st : cpstate) tc =
     FApi.t_seq (FApi.t_try tt) (aux1 st) tc
