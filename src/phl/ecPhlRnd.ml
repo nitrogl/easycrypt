@@ -112,10 +112,6 @@ let wp_equiv_rnd_r bij tc =
   FApi.xmutate1 tc `Rnd [concl]
 
 (* -------------------------------------------------------------------- *)
-let destr_and3 f =
-  let c1, (c2, c3) = snd_map destr_and (destr_and f) in (c1, c2, c3)
-
-(* -------------------------------------------------------------------- *)
 let wp_equiv_rnd_r bij tc =
   let module E = struct exception Abort end in
 
@@ -176,17 +172,16 @@ let wp_equiv_rnd_r bij tc =
   let x   = EcIdent.create "_" in
   let hin = EcIdent.create "_" in
 
-
   FApi.t_onalli (function
     | 0 -> EcLowGoal.t_trivial ?subtc:None
     | 1 ->
       let open EcProofTerm.Prept in
 
      let proj1 pt =
-       uglob CI_Logic.p_anda_proj_l @ [a_; a_; asub pt] in
+       uglob CI_Logic.p_anda_proj_l @ [h_; h_; asub pt] in
 
      let proj2 pt h =
-       uglob CI_Logic.p_anda_proj_r @ [a_; a_; asub pt; ahyp h] in
+       uglob CI_Logic.p_anda_proj_r @ [h_; h_; asub pt; ahyp h] in
 
       let t_c1  = t_apply_prept (proj1 (hyp h)) in
 
