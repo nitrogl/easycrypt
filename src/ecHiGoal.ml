@@ -1280,7 +1280,10 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
 
   and intro1_crush (_st : ST.state) (d : crushmode) (gs : tcenv1) =
     let delta, tsolve = process_crushmode d in
-    EcLowGoal.t_crush ~delta ?tsolve gs
+    FApi.t_or
+      (EcPhlConseq.t_conseqauto ~delta ?tsolve)
+      (EcLowGoal.t_crush ~delta ?tsolve)
+      gs
 
   and dointro (st : ST.state) nointro pis (gs : tcenv) =
     match pis with [] -> gs | { pl_desc = pi; pl_loc = ploc } :: pis ->
