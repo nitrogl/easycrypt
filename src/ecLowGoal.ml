@@ -2137,7 +2137,7 @@ let t_auto ?(bases = [EcEnv.Auto.dname]) ?(depth = 1) (tc : tcenv1) =
 
 
 (* --------------------------------------------------------------------- *)
-let t_crush_post ?(delta = true) nb_intros (tc : tcenv1) =
+let t_crush_fwd ?(delta = true) nb_intros (tc : tcenv1) =
   let t_progress_subst ?eqid =
     let sk1 = { empty_subst_kind with sk_local = true ; } in
     let sk2 = {  full_subst_kind with sk_local = false; } in
@@ -2148,13 +2148,9 @@ let t_crush_post ?(delta = true) nb_intros (tc : tcenv1) =
 
   let tt = FApi.t_try (t_assumption `Alpha) in
 
-  let ts id =
-    FApi.t_try (t_progress_subst ~eqid:id) in
+  let ts id = FApi.t_try (t_progress_subst ~eqid:id) in
 
-  let rec entry (nbi : int) tc =
-   (* FApi.t_seq (t_simplify ~delta:false)*) (aux0 nbi) tc
-
-  and aux0 (nbi : int) tc =
+  let rec aux0 (nbi : int) tc =
     FApi.t_seq (FApi.t_try tt) (aux1 nbi) tc
 
   and aux1 (nbi : int) tc =
@@ -2183,39 +2179,30 @@ let t_crush_post ?(delta = true) nb_intros (tc : tcenv1) =
         let incr i = nbi + i - 1 in
 
         let iffail tc =
-          (t_intros_i_seq [id] (ts id) @!
-           entry (incr 0)) tc
+          (t_intros_i_seq [id] (ts id) @! aux0 (incr 0)) tc
         in
 
-        let cont = ref t_id in
         let t_elim_false_r f concl tc =
-          cont := t_id;
-          t_elim_false_r f concl tc in
-        let t_elim_and_r f concl tc =
-          cont := aux0 (incr 2);
-          t_elim_and_r f concl tc in
-        let t_elim_eq_tuple_r f concl tc =
-          let n, tc = t_elim_eq_tuple_r_n f concl tc in
-          cont :=  aux0 (incr n);
-          tc in
-        let ifok tc = !cont tc in
-        let elims  =
-          [ t_elim_false_r;
-            t_elim_and_r;
-            t_elim_eq_tuple_r;
-          ] in
+          (t_elim_false_r f concl tc, t_id)
 
+        and t_elim_and_r f concl tc =
+          (t_elim_and_r f concl tc, aux0 (incr 2))
+
+        and t_elim_eq_tuple_r f concl tc =
+          let n, tc = t_elim_eq_tuple_r_n f concl tc in
+          (tc, aux0 (incr n)) in
+
+        let elims  = [ t_elim_false_r; t_elim_and_r; t_elim_eq_tuple_r; ] in
         let reduce = if delta then `Full else `NoDelta in
 
         FApi.t_onall
-          (FApi.t_switch ~on:`All ~ifok ~iffail
-             (t_elim_r ~reduce elims))
-            tc
+          (FApi.t_xswitch ~on:`All ~iffail (t_elim_r ~reduce elims))
+          tc
       end
 
     | _ -> t_fail tc
   in
 
   FApi.t_seq
-    (entry nb_intros)
+    (aux0 nb_intros)
     (t_simplify_with_info EcReduction.nodelta) tc

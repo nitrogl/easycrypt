@@ -1066,11 +1066,9 @@ let process_conseq_opt cqopt infos tc =
   process_conseq cqopt.cqo_frame infos tc
 
 (* -------------------------------------------------------------------- *)
+let t_conseqauto ?(delta = true) ?tsolve tc =
+  let (hyps, concl), mk_other = FApi.tc1_flat tc, true in
 
-let t_conseqauto ?(delta=true) ?tsolve tc =
-  let hyps = FApi.tc1_hyps tc in
-  let concl = FApi.tc1_goal tc in
-  let mk_other = true in
   let todo =
     match concl.f_node with
     | FhoareF hf   -> Some (t_hoareF_notmod, cond_hoareF_notmod ~mk_other tc hf.hf_po)
@@ -1082,28 +1080,32 @@ let t_conseqauto ?(delta=true) ?tsolve tc =
     | _            -> None in
 
   match todo with
-  | None -> tc_error_noXhl ~kinds:hlkinds_Xhl !!tc
+  | None ->
+    tc_error_noXhl ~kinds:hlkinds_Xhl !!tc
+
   | Some (t_notmod, (cond, bdm, bdo)) ->
-    let alln = List.map EcIdent.name (bdm@List.map fst bdo) in
+    let alln = List.map EcIdent.name (bdm @ List.map fst bdo) in
     let ids = EcEnv.LDecl.fresh_ids hyps alln in
     let ms, other = List.split_at (List.length bdm) ids in
-    let tc' = EcCoreGoal.tcenv1_of_proof( EcCoreGoal.start hyps cond) in
-    let rec my_intros_i other bdo tc =
-      match other, bdo with
-      | [], [] -> t_id tc
-      | x::other, x'::bdo ->
-        let concl = FApi.tc1_goal tc in
-        let (x1,_,_) = destr_forall1 concl in
-        if EcIdent.id_equal x' x1 then (t_intro_i x @! my_intros_i other bdo) tc
-        else my_intros_i other bdo tc
-      | _,_ -> assert false in
+    let tc' = EcCoreGoal.tcenv1_of_proof (EcCoreGoal.start hyps cond) in
+
+    let rec my_intros_i (oth_bdo) tc =
+      match oth_bdo with
+      | [] -> t_id tc
+      | (x, x') :: oth_bdo ->
+        let x1 = proj3_1 (destr_forall1 (FApi.tc1_goal tc)) in
+        if   EcIdent.id_equal x' x1
+        then (t_intro_i x @! my_intros_i oth_bdo) tc
+        else  my_intros_i oth_bdo tc
+    in
 
     let tc' =
       FApi.t_seqs
-        [my_intros_i ms bdm;
-         t_crush_post ~delta 1;
-         my_intros_i other (List.map fst bdo);
-         t_crush ~delta ?tsolve ] tc' in
+        [ my_intros_i (List.combine ms bdm)
+        ; t_crush_fwd ~delta 1
+        ; my_intros_i (List.combine other (List.map fst bdo))
+        ; t_crush ~delta ?tsolve ] tc' in
+
     let post =
       if FApi.tc_done tc' then f_true
       else
@@ -1113,5 +1115,6 @@ let t_conseqauto ?(delta=true) ?tsolve tc =
         let s = List.fold_left2 Fsubst.f_bind_mem s ms bdm in
         let s = List.fold_left2 Fsubst.f_bind_local s other (List.map snd bdo) in
         Fsubst.f_subst s concl in
+
     let t_end = FApi.t_try (t_crush ~delta ?tsolve @! t_fail) in
     FApi.t_first t_end (t_notmod post tc)

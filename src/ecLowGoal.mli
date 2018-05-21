@@ -288,7 +288,9 @@ val t_progress :
      ?ti:(EcIdent.t -> EcCoreGoal.FApi.backward) ->
      FApi.backward -> FApi.backward
 
-val t_crush : ?delta:bool -> ?tsolve:FApi.backward -> FApi.backward
+(* -------------------------------------------------------------------- *)
+val t_crush     : ?delta:bool -> ?tsolve:FApi.backward -> FApi.backward
+val t_crush_fwd : ?delta:bool -> int -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_congr : form pair -> form pair list * ty -> FApi.backward
@@ -300,6 +302,3 @@ val t_smt: mode:smtmode -> prover_infos -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_auto : ?bases:symbol list -> ?depth:int -> FApi.backward
-
-(* -------------------------------------------------------------------- *)
-val t_crush_post : ?delta:bool -> int -> FApi.backward
