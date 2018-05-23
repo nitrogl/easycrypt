@@ -21,22 +21,29 @@ open EcPhlAuto
 type ll_strategy =
   | LL_WP
   | LL_RND
-  | LL_CALL
+  | LL_CALL of bool
   | LL_JUMP
   | LL_COND of ll_strategy list pair
 
 (* -------------------------------------------------------------------- *)
-let rec ll_strategy_of_stmt (s : stmt) =
-  List.rev_map ll_strategy_of_instr s.s_node
+let rec ll_strategy_of_stmt (env : EcEnv.env) (s : stmt) =
+  List.rev_map (ll_strategy_of_instr env) s.s_node
 
-and ll_strategy_of_instr (i : instr) =
+and ll_strategy_of_instr (env : EcEnv.env) (i : instr) =
   match i.i_node with
   | Sasgn _ -> LL_WP
   | Srnd  _ -> LL_RND
-  | Scall _ -> LL_CALL
+
+  | Scall (_, p, _) ->
+      let p    = EcEnv.NormMp.norm_xfun env p in
+      let proc = EcEnv.Fun.by_xpath p env in
+      let defn = match proc.f_def with FBdef _ -> true | _ -> false in
+      LL_CALL defn
 
   | Sif (_, s1, s2) ->
-      LL_COND (ll_strategy_of_stmt s1, ll_strategy_of_stmt s2)
+      let st1 = ll_strategy_of_stmt env s1 in
+      let st2 = ll_strategy_of_stmt env s2 in
+      LL_COND (st1, st2)
 
   | _ -> LL_JUMP
 
@@ -63,9 +70,12 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
       @> EcPhlConseq.t_bdHoareS_conseq f_true f_true
       @~ FApi.t_on1 (-1) ~ttout:ll_trivial t_id
 
-  | LL_CALL ->
+  | LL_CALL true ->
          EcPhlCall.t_bdhoare_call f_true f_true None
       @~ FApi.t_swap_goals 0 1
+
+  | LL_CALL false ->
+         apply_ll_strategy1 LL_JUMP
 
   | LL_JUMP ->
         ( EcPhlApp.t_bdhoare_app
@@ -96,7 +106,8 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
 
 (* -------------------------------------------------------------------- *)
 let t_lossless1_r tc =
-  let lls = ll_strategy_of_stmt (tc1_as_bdhoareS tc).bhs_s in
+  let env = FApi.tc1_env tc in
+  let lls = ll_strategy_of_stmt env (tc1_as_bdhoareS tc).bhs_s in
 
   let tt =
     (  apply_ll_strategy lls
