@@ -585,7 +585,7 @@ type phltactic =
   | Pfel           of (int * fel_info)
   | Phoare
   | Pprbounded
-  | Psim           of sim_info
+  | Psim           of crushmode option* sim_info
   | Ptrans_stmt    of trans_info
   | Psymmetry
   | Pbdhoare_split of bdh_split
