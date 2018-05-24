@@ -70,12 +70,9 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
       @> EcPhlConseq.t_bdHoareS_conseq f_true f_true
       @~ FApi.t_on1 (-1) ~ttout:ll_trivial t_id
 
-  | LL_CALL true ->
+  | LL_CALL _ ->
          EcPhlCall.t_bdhoare_call f_true f_true None
-      @~ FApi.t_swap_goals 0 1
-
-  | LL_CALL false ->
-         apply_ll_strategy1 LL_JUMP
+      @~ FApi.t_rotate `Left 1
 
   | LL_JUMP ->
         ( EcPhlApp.t_bdhoare_app
