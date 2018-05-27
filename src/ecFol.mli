@@ -57,6 +57,11 @@ val f_real_inv : form -> form
 val f_real_div : form -> form -> form
 val f_real_abs : form -> form
 
+(* soft-constructor - map *)
+val f_map_cst : EcTypes.ty -> form -> form
+val f_map_get : form -> form -> EcTypes.ty -> form
+val f_map_set : form -> form -> form -> form
+
 (* soft constructors - distributions *)
 val fop_support : EcTypes.ty -> form
 
@@ -146,6 +151,9 @@ type op_kind = [
   | `Real_opp
   | `Real_mul
   | `Real_inv
+  | `Map_get
+  | `Map_set
+  | `Map_cst
 ]
 
 val op_kind       : path -> op_kind option
