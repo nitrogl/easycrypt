@@ -1015,7 +1015,7 @@ qident_or_res_or_glob:
 | GLOB mp=loc(mod_qident) { GVglob mp }
 
 pffilter:
-| LBRACKET flat=boption(SLASH)
+| LBRACKET flat=iboption(SLASH)
     rg=plist0(
       i=sword? COLON j=sword? { (i, j) }
     | i=sword                 { (Some i, None) }, COMMA)
@@ -1023,11 +1023,11 @@ pffilter:
 
   { PFRange (flat, rg) }
 
-| LBRACKET x=ident IN h=form_h RBRACKET
+| LBRACE x=ident IN h=form_h RBRACE
 
   { PFMatch (x, h) }
 
-| LBRACKET f=form FOR xs=plist1(ident, COMMA) IN h=form_h RBRACKET
+| LBRACE f=form FOR xs=plist1(ident, COMMA) IN h=form_h RBRACE
 
   { PFMatchBuild (xs, f, h) }
 
