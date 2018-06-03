@@ -236,6 +236,84 @@ module EqTest = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module User = struct
+  type error =
+    | MissingVarInLhs   of EcIdent.t
+    | MissingTyVarInLhs of EcIdent.t
+    | NotAnEq
+    | NotFirstOrder
+    | RuleDependsOnMemOrModule
+    | HeadedByVar
+
+  exception InvalidUserRule of error
+
+  module R = EcTheory
+
+  type rule = EcEnv.Reduction.rule
+
+  let compile (env : EcEnv.env) (p : EcPath.path) =
+    let ax = EcEnv.Ax.by_path p env in
+    let bds, rl = EcFol.decompose_forall ax.EcDecl.ax_spec in
+
+    let bds =
+      let filter = function
+        | (x, GTty ty) -> (x, ty)
+        | _ -> raise (InvalidUserRule RuleDependsOnMemOrModule)
+      in List.map filter bds in
+
+    let lhs, rhs =
+      try  EcFol.destr_eq rl
+      with DestrError _ -> raise (InvalidUserRule NotAnEq) in
+
+    let rule =
+      let rec rule (f : form) : EcTheory.rule_pattern =
+        match EcFol.destr_app f with
+        | { f_node = Fop (p, tys) }, args ->
+            R.Rule ((p, tys), List.map rule args)
+        | { f_node = Flocal x }, [] ->
+            R.Var x
+        | _ -> raise (InvalidUserRule NotFirstOrder)
+      in rule lhs in
+
+    let lvars, ltyvars =
+      let rec doit (lvars, ltyvars) = function
+        | R.Var x ->
+            (Sid.add x lvars, ltyvars)
+
+        | R.Rule ((_, tys), args) ->
+            let ltyvars =
+              List.fold_left (
+                  let rec doit ltyvars = function
+                    | { ty_node = Tvar a } -> Sid.add a ltyvars
+                    | _ as ty -> ty_fold doit ltyvars ty in doit)
+                ltyvars tys in
+
+            List.fold_left doit (lvars, ltyvars) args
+
+      in doit (Sid.empty, Sid.empty) rule in
+
+    let mvars   =
+      Sid.diff (Sid.of_list (List.map fst bds)) lvars in
+    let mtyvars =
+      Sid.diff (Sid.of_list (List.map fst ax.EcDecl.ax_tparams)) ltyvars in
+
+    if not (Sid.is_empty mvars) then
+      raise (InvalidUserRule (MissingVarInLhs (Sid.choose mvars)));
+    if not (Sid.is_empty mtyvars) then
+      raise (InvalidUserRule (MissingTyVarInLhs (Sid.choose mtyvars)));
+
+    begin match rule with
+    | R.Var _ -> raise (InvalidUserRule (HeadedByVar));
+    | _       -> () end;
+
+    R.{ rl_tyd  = ax.EcDecl.ax_tparams;
+        rl_vars = bds;
+        rl_ptn  = rule;
+        rl_tg   = rhs; }
+
+end
+
+(* -------------------------------------------------------------------- *)
 type reduction_info = {
   beta    : bool;
   delta_p : (path  -> bool);
@@ -245,12 +323,12 @@ type reduction_info = {
   eta     : bool;
   logic   : rlogic_info;
   modpath : bool;
+  user    : bool;
 }
 
 and rlogic_info = [`Full | `ProductCompat] option
 
 (* -------------------------------------------------------------------- *)
-
 let full_red = {
   beta    = true;
   delta_p = EcUtils.predT;
@@ -260,6 +338,7 @@ let full_red = {
   eta     = true;
   logic   = Some `Full;
   modpath = true;
+  user    = true;
 }
 
 let no_red = {
@@ -271,6 +350,7 @@ let no_red = {
   eta     = false;
   logic   = None;
   modpath = false;
+  user    = false;
 }
 
 let beta_red     = { no_red with beta = true; }
@@ -437,7 +517,25 @@ let rec h_red ri env hyps f =
       let pv' = EcEnv.NormMp.norm_pvar env pv in
         if pv_equal pv pv' then raise NotReducible else f_pvar pv' f.f_ty m
 
-    (* logical reduction *)
+    (* η-reduction *)
+  | Fquant (Llambda, [x, GTty _], { f_node = Fapp (fn, args) })
+      when can_eta x (fn, args)
+    -> f_app fn (List.take (List.length args - 1) args) f.f_ty
+
+  | _ ->
+      let strategies =
+        [ reduce_logic   ;
+          reduce_delta   ;
+          reduce_user    ;
+          reduce_context ] in
+
+       oget ~exn:NotReducible (List.Exceptionless.find_map
+         (fun strategy ->
+            try Some (strategy ri env hyps f) with NotReducible -> None)
+         strategies)
+
+and reduce_logic ri env hyps f =
+  match f.f_node with
   | Fapp ({f_node = Fop (p, tys); } as fo, args)
       when is_some ri.logic && is_logical_op p
     ->
@@ -503,20 +601,22 @@ let rec h_red ri env hyps f =
         then f_app fo (h_red_args ri env hyps args) f.f_ty
         else f'
 
-    (* δ-reduction *)
-  | Fop (p, tys) ->
+  | _ -> raise NotReducible
+
+and reduce_delta ri env _hyps f =
+  match f.f_node with
+  | Fop (p, tys) when ri.delta_p p ->
       reduce_op ri env p tys
 
-    (* δ-reduction *)
   | Fapp ({ f_node = Fop (p, tys) }, args) when ri.delta_p p ->
       let op = reduce_op ri env p tys in
       f_app_simpl op args f.f_ty
 
-    (* η-reduction *)
-  | Fquant (Llambda, [x, GTty _], { f_node = Fapp (fn, args) })
-      when can_eta x (fn, args)
-    -> f_app fn (List.take (List.length args - 1) args) f.f_ty
+  | _ -> raise NotReducible
 
+
+and reduce_context ri env hyps f =
+  match f.f_node with
     (* contextual rule - let *)
   | Flet (lp, f1, f2) -> f_let lp (h_red ri env hyps f1) f2
 
@@ -541,6 +641,60 @@ let rec h_red ri env hyps f =
     end
 
   | _ -> raise NotReducible
+
+and reduce_user ri env hyps f =
+  if not ri.user then raise NotReducible;
+
+  let (p, _), _ =
+    match destr_app f with
+    | { f_node = Fop (p, ty) }, args -> (p, ty), args
+    | _ -> raise NotReducible in
+
+  let rules = EcEnv.Reduction.get p env in
+
+  let module R = EcTheory in
+
+  oget ~exn:NotReducible (List.Exceptionless.find_map (fun rule ->
+    let ue  = EcUnify.UniEnv.create None in
+    let tvi = EcUnify.UniEnv.opentvi ue rule.R.rl_tyd None in
+    let pv  = ref Mid.empty in
+
+    try
+      let rec doit f ptn =
+        match destr_app f, ptn with
+        | ({ f_node = Fop (p, tys) }, args), R.Rule ((p', tys'), args')
+              when EcPath.p_equal p p' && List.length args = List.length args' ->
+
+          let tys' = List.map (EcTypes.Tvar.subst tvi) tys' in
+
+          begin
+            try  List.iter2 (EcUnify.unify env ue) tys tys'
+            with EcUnify.UnificationFailure _ -> raise NotReducible end;
+
+          List.iter2 doit args args'
+
+        | _, R.Var x -> begin
+            match Mid.find_opt x !pv with
+            | None    -> pv := Mid.add x f !pv
+            | Some f' -> check_alpha_equal ri hyps f f'
+          end
+
+        | _ -> raise NotReducible in
+
+      doit f rule.R.rl_ptn;
+
+      if not (EcUnify.UniEnv.closed ue) then
+        raise NotReducible;
+
+      let subst =
+        let tysubst = { ty_subst_id with ts_u = EcUnify.UniEnv.assubst ue } in
+        let subst   = Fsubst.f_subst_init ~sty:tysubst () in
+        Mid.fold (fun x f s -> Fsubst.f_bind_local s x f) !pv subst in
+
+      Some (Fsubst.f_subst subst (Fsubst.subst_tvar tvi rule.R.rl_tg))
+
+    with NotReducible -> None)
+  rules)
 
 and can_eta x (f, args) =
   match List.rev args with

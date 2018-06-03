@@ -502,6 +502,9 @@ let rec subst_theory_item (s : _subst) (item : theory_item) =
   | Th_addrw (b, ls) ->
       Th_addrw (s.s_p b, List.map s.s_p ls)
 
+  | Th_reduction _ ->           (* FIXME: reduction *)
+      item
+
   | Th_auto (lc, lvl, base, ps) ->
       Th_auto (lc, lvl, base, List.map s.s_p ps)
 
@@ -544,6 +547,9 @@ and subst_ctheory_item (s : _subst) (item : ctheory_item) =
 
   | CTh_addrw (b, ls) ->
       CTh_addrw (s.s_p b, List.map s.s_p ls)
+
+  | CTh_reduction _ ->
+      item                      (* FIXME: reduction *)
 
   | CTh_auto (lc, lvl, base, ps) ->
       CTh_auto (lc, lvl, base, List.map s.s_p ps)

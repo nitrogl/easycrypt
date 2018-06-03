@@ -530,6 +530,10 @@ and process_addrw scope (local, base, names) =
   EcScope.Auto.addrw scope ~local ~base names
 
 (* -------------------------------------------------------------------- *)
+and process_reduction scope name =
+  EcScope.Reduction.add_reduction scope name
+
+(* -------------------------------------------------------------------- *)
 and process_hint scope hint =
   EcScope.Auto.addhint scope hint
 
@@ -626,6 +630,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Gpragma      opt  -> `State (fun scope -> process_pragma     scope  opt)
       | Goption      opt  -> `Fct   (fun scope -> process_option     scope  opt)
       | Gaddrw       hint -> `Fct   (fun scope -> process_addrw      scope hint)
+      | Greduction   red  -> `Fct   (fun scope -> process_reduction  scope red)
       | Ghint        hint -> `Fct   (fun scope -> process_hint       scope hint)
       | GdumpWhy3    file -> `Fct   (fun scope -> process_dump_why3  scope file)
     with
