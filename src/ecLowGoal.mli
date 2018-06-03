@@ -57,6 +57,14 @@ val t_simplify_with_info :
   ?target:ident -> reduction_info -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
+val t_cbv :
+     ?target:ident -> ?delta:bool -> ?logic:rlogic_info
+  -> FApi.backward
+
+val t_cbv_with_info :
+  ?target:ident -> reduction_info -> FApi.backward
+
+(* -------------------------------------------------------------------- *)
 val t_change : ?target:ident -> form -> tcenv1 -> tcenv1
 
 (* -------------------------------------------------------------------- *)

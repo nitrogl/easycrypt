@@ -391,6 +391,7 @@
 %token BYPR
 %token CALL
 %token CASE
+%token CBV
 %token CEQ
 %token CFOLD
 %token CHANGE
@@ -2298,6 +2299,11 @@ simplify:
 | SIMPLIFY l=qoident+ { `Delta l  :: simplify_red  }
 | SIMPLIFY DELTA      { `Delta [] :: simplify_red }
 
+cbv:
+| CBV            { simplify_red }
+| CBV l=qoident+ { `Delta l  :: simplify_red  }
+| CBV DELTA      { `Delta [] :: simplify_red }
+
 conseq:
 | empty                           { None, None }
 | UNDERSCORE LONGARROW UNDERSCORE { None, None }
@@ -2517,6 +2523,9 @@ logtactic:
 
 | l=simplify
    { Psimplify (mk_simplify l) }
+
+| l=cbv
+   { Pcbv (mk_simplify l) }
 
 | CHANGE f=sform
    { Pchange f }

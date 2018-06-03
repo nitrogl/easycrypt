@@ -290,6 +290,17 @@ let t_simplify ?target ?(delta = true) ?(logic = Some `Full) (tc : tcenv1) =
   t_simplify_with_info ?target ri tc
 
 (* -------------------------------------------------------------------- *)
+let t_cbv_with_info ?target (ri : reduction_info) (tc : tcenv1) =
+  let action (lazy hyps) fp = Some (EcCallbyValue.norm_cbv ri hyps fp) in
+  FApi.tcenv_of_tcenv1 (t_change_r ?target action tc)
+
+(* -------------------------------------------------------------------- *)
+let t_cbv ?target ?(delta = true) ?(logic = Some `Full) (tc : tcenv1) =
+  let ri = if delta then full_red else nodelta in
+  let ri = { ri with logic } in
+  t_cbv_with_info ?target ri tc
+
+(* -------------------------------------------------------------------- *)
 let t_clears1 ?(leniant = false) xs tc =
   let (hyps, concl) = FApi.tc1_flat tc in
 

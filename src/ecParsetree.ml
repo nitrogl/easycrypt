@@ -797,6 +797,7 @@ type logtactic =
   | Prwnormal   of pformula * pqsymbol list
   | Psubst      of pformula list
   | Psimplify   of preduction
+  | Pcbv        of preduction
   | Pchange     of pformula
   | Ppose       of (psymbol * ptybinding list * rwocc * pformula)
   | Pwlog       of (psymbol list * pformula)
