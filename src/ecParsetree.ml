@@ -392,6 +392,7 @@ type preduction = {
   peta     : bool;                      (* η-reduction *)
   plogic   : bool;                      (* logical simplification *)
   pmodpath : bool;                      (* modpath normalization *)
+  puser    : bool;                      (* user reduction *)
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1042,6 +1043,7 @@ type global_action =
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gaddrw       of (bool * pqsymbol * pqsymbol list)
+  | Greduction   of pqsymbol
   | Ghint        of phint
   | Gprint       of pprint
   | Gsearch      of pformula list
