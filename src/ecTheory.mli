@@ -40,6 +40,7 @@ and rule_pattern =
 and rule = {
   rl_tyd  : EcDecl.ty_params;
   rl_vars : (EcIdent.t * EcTypes.ty) list;
+  rl_cond : EcCoreFol.form list;
   rl_ptn  : rule_pattern;
   rl_tg   : EcCoreFol.form;
 }

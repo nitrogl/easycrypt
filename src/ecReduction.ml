@@ -261,9 +261,14 @@ module User = struct
         | _ -> raise (InvalidUserRule RuleDependsOnMemOrModule)
       in List.map filter bds in
 
-    let lhs, rhs =
-      try  EcFol.destr_eq rl
-      with DestrError _ -> raise (InvalidUserRule NotAnEq) in
+    let lhs, rhs, conds =
+      let rec doit conds f =
+        match sform_of_form f with
+        | SFimp (f1, f2) -> doit (f1 :: conds) f2
+        | SFeq  (f1, f2) -> (f1, f2, List.rev conds)
+        | _              -> raise (InvalidUserRule NotAnEq)
+      in doit [] rl
+    in
 
     let rule =
       let rec rule (f : form) : EcTheory.rule_pattern =
@@ -308,6 +313,7 @@ module User = struct
 
     R.{ rl_tyd  = ax.EcDecl.ax_tparams;
         rl_vars = bds;
+        rl_cond = conds;
         rl_ptn  = rule;
         rl_tg   = rhs; }
 
@@ -377,7 +383,7 @@ let is_record env f =
   | _ -> false
 
 (* -------------------------------------------------------------------- *)
-let rec h_red ri env hyps f =
+let rec h_red_x ri env hyps f =
   match f.f_node with
     (* β-reduction *)
   | Fapp ({ f_node = Fquant (Llambda, _, _)}, _) when ri.beta ->
@@ -435,18 +441,18 @@ let rec h_red ri env hyps f =
           | _ -> raise NotReducible
 
         with NotReducible ->
-          f_app (h_red ri env hyps f1) args f.f_ty
+          f_app (h_red_x ri env hyps f1) args f.f_ty
       end
 
     (* ι-reduction (tuples projection) *)
   | Fproj(f1, i) when ri.iota ->
       let f' = f_proj_simpl f1 i f.f_ty in
-        if f_equal f f' then f_proj (h_red ri env hyps f1) i f.f_ty else f'
+        if f_equal f f' then f_proj (h_red_x ri env hyps f1) i f.f_ty else f'
 
     (* ι-reduction (if-then-else) *)
   | Fif (f1, f2, f3) when ri.iota ->
       let f' = f_if_simpl f1 f2 f3 in
-        if f_equal f f' then f_if (h_red ri env hyps f1) f2 f3 else f'
+        if f_equal f f' then f_if (h_red_x ri env hyps f1) f2 f3 else f'
 
     (* ι-reduction (match-fix) *)
   | Fapp ({ f_node = Fop (p, tys); } as f1, fargs)
@@ -504,7 +510,7 @@ let rec h_red ri env hyps f =
             Fsubst.f_subst subst body
 
         with NotReducible ->
-          f_app (h_red ri env hyps f1) fargs f.f_ty
+          f_app (h_red_x ri env hyps f1) fargs f.f_ty
     end
 
     (* μ-reduction *)
@@ -618,11 +624,11 @@ and reduce_delta ri env _hyps f =
 and reduce_context ri env hyps f =
   match f.f_node with
     (* contextual rule - let *)
-  | Flet (lp, f1, f2) -> f_let lp (h_red ri env hyps f1) f2
+  | Flet (lp, f1, f2) -> f_let lp (h_red_x ri env hyps f1) f2
 
     (* Contextual rule - application args. *)
   | Fapp (f1, args) ->
-      f_app (h_red ri env hyps f1) args f.f_ty
+      f_app (h_red_x ri env hyps f1) args f.f_ty
 
     (* Contextual rule - bindings *)
   | Fquant (Lforall as t, b, f1)
@@ -634,7 +640,7 @@ and reduce_context ri env hyps f =
 
       try
         let env = Mod.add_mod_binding b env in
-          ctor b (h_red ri env hyps f1)
+          ctor b (h_red_x ri env hyps f1)
       with NotReducible ->
         let f' = ctor b f1 in
           if f_equal f f' then raise NotReducible else f'
@@ -686,12 +692,19 @@ and reduce_user ri env hyps f =
       if not (EcUnify.UniEnv.closed ue) then
         raise NotReducible;
 
-      let subst =
+      let subst f =
         let tysubst = { ty_subst_id with ts_u = EcUnify.UniEnv.assubst ue } in
         let subst   = Fsubst.f_subst_init ~sty:tysubst () in
-        Mid.fold (fun x f s -> Fsubst.f_bind_local s x f) !pv subst in
+        let subst   = Mid.fold (fun x f s -> Fsubst.f_bind_local s x f) !pv subst in
+        Fsubst.f_subst subst (Fsubst.subst_tvar tvi f)
+      in
 
-      Some (Fsubst.f_subst subst (Fsubst.subst_tvar tvi rule.R.rl_tg))
+      List.iter (fun cond ->
+        if not (f_equal (simplify ri env hyps (subst cond)) f_true) then
+          raise NotReducible)
+        rule.R.rl_cond;
+
+      Some (subst rule.R.rl_tg)
 
     with NotReducible -> None)
   rules)
@@ -707,11 +720,11 @@ and h_red_args ri env hyps args =
   match args with
   | [] -> raise NotReducible
   | a :: args ->
-    try h_red ri env hyps a :: args
+    try h_red_x ri env hyps a :: args
     with NotReducible -> a :: h_red_args ri env hyps args
 
 and h_red_opt ri env hyps f =
-  try Some (h_red ri env hyps f)
+  try Some (h_red_x ri env hyps f)
   with NotReducible -> None
 
 and check_alpha_equal ri hyps f1 f2 =
@@ -932,54 +945,58 @@ and is_alpha_eq hyps f1 f2 =
   try check_alpha_eq hyps f1 f2; true
   with _ -> false
 
-let is_conv hyps f1 f2 =
-  try check_conv hyps f1 f2; true
-  with _ -> false
-
-let h_red ri hyps f =
-   h_red ri (LDecl.toenv hyps) hyps f
-
-let h_red_opt ri hyps f = h_red_opt ri (LDecl.toenv hyps) hyps f
-
-let rec simplify ri hyps f =
-  let f' = try h_red ri hyps f with NotReducible -> f in
+and simplify ri env hyps f =
+  let f' = try h_red_x ri env hyps f with NotReducible -> f in
   if   f == f'
-  then simplify_rec ri hyps f
-  else simplify ri hyps f'
+  then simplify_rec ri env hyps f
+  else simplify ri env hyps f'
 
-and simplify_rec ri hyps f =
+and simplify_rec ri env hyps f =
   match f.f_node with
 
   | Fapp ({ f_node = Fop _ } as fo, args) ->
-      let args' = List.map (simplify ri hyps) args in
+      let args' = List.map (simplify ri env hyps) args in
       let app1  = (fo, args , f.f_ty) in
       let app2  = (fo, args', f.f_ty) in
       let f'    =  EcFol.FSmart.f_app (f, app1) app2 in
-      (try h_red ri hyps f' with NotReducible -> f')
+      (try h_red_x ri env hyps f' with NotReducible -> f')
 
   | FhoareF hf when ri.modpath ->
       let hf_f = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) hf.hf_f in
-      f_map (fun ty -> ty) (simplify ri hyps) (f_hoareF_r { hf with hf_f })
+      f_map (fun ty -> ty) (simplify ri env hyps) (f_hoareF_r { hf with hf_f })
 
   | FbdHoareF hf when ri.modpath ->
       let bhf_f = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) hf.bhf_f in
-      f_map (fun ty -> ty) (simplify ri hyps) (f_bdHoareF_r { hf with bhf_f })
+      f_map (fun ty -> ty) (simplify ri env hyps) (f_bdHoareF_r { hf with bhf_f })
 
   | FequivF ef when ri.modpath ->
       let ef_fl = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) ef.ef_fl in
       let ef_fr = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) ef.ef_fr in
-      f_map (fun ty -> ty) (simplify ri hyps) (f_equivF_r { ef with ef_fl; ef_fr; })
+      f_map (fun ty -> ty) (simplify ri env hyps) (f_equivF_r { ef with ef_fl; ef_fr; })
 
   | FeagerF eg when ri.modpath ->
       let eg_fl = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) eg.eg_fl in
       let eg_fr = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) eg.eg_fr in
-      f_map (fun ty -> ty) (simplify ri hyps) (f_eagerF_r { eg with eg_fl ; eg_fr; })
+      f_map (fun ty -> ty) (simplify ri env hyps) (f_eagerF_r { eg with eg_fl ; eg_fr; })
 
   | Fpr pr  when ri.modpath ->
       let pr_fun = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) pr.pr_fun in
-      f_map (fun ty -> ty) (simplify ri hyps) (f_pr_r { pr with pr_fun })
+      f_map (fun ty -> ty) (simplify ri env hyps) (f_pr_r { pr with pr_fun })
 
-  | _ -> f_map (fun ty -> ty) (simplify ri hyps) f
+  | _ -> f_map (fun ty -> ty) (simplify ri env hyps) f
+
+(* -------------------------------------------------------------------- *)
+let is_conv hyps f1 f2 =
+  try check_conv hyps f1 f2; true with _ -> false
+
+let h_red ri hyps f =
+   h_red_x ri (LDecl.toenv hyps) hyps f
+
+let h_red_opt ri hyps f =
+  h_red_opt ri (LDecl.toenv hyps) hyps f
+
+let simplify ri hyps f =
+  simplify ri (LDecl.toenv hyps) hyps f
 
 (* -------------------------------------------------------------------- *)
 type xconv = [`Eq | `AlphaEq | `Conv]
