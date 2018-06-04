@@ -1356,7 +1356,7 @@ module Reduction = struct
       | Rule ((p, _), _) -> p
       | Var _ -> assert false
 
-   in Mp.change (fun rls -> Some (rule :: odfl [] rls)) p db
+   in Mp.change (fun rls -> Some (odfl [] rls @ [rule])) p db
 
   let add (rule : rule) (env : env) =
     { env with
