@@ -39,6 +39,7 @@ and thmode     = [ `Abstract | `Concrete ]
 
 and rule_pattern =
   | Rule of (EcPath.path * EcTypes.ty list) * rule_pattern list
+  | Int  of EcBigInt.zint
   | Var  of EcIdent.t
 
 and rule = {

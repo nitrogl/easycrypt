@@ -275,6 +275,8 @@ module User = struct
         match EcFol.destr_app f with
         | { f_node = Fop (p, tys) }, args ->
             R.Rule ((p, tys), List.map rule args)
+        | { f_node = Fint i }, [] ->
+            R.Int i
         | { f_node = Flocal x }, [] ->
             R.Var x
         | _ -> raise (InvalidUserRule NotFirstOrder)
@@ -284,6 +286,9 @@ module User = struct
       let rec doit (lvars, ltyvars) = function
         | R.Var x ->
             (Sid.add x lvars, ltyvars)
+
+        | R.Int _ ->
+            (lvars, ltyvars)
 
         | R.Rule ((_, tys), args) ->
             let ltyvars =
@@ -678,6 +683,9 @@ and reduce_user ri env hyps f =
             with EcUnify.UnificationFailure _ -> raise NotReducible end;
 
           List.iter2 doit args args'
+
+        | ({ f_node = Fint i }, []), R.Int j when EcBigInt.equal i j ->
+            ()
 
         | _, R.Var x -> begin
             match Mid.find_opt x !pv with
