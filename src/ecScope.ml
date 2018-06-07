@@ -2115,6 +2115,7 @@ end
 (* -------------------------------------------------------------------- *)
 module Reduction = struct
   let add_reduction scope name =
+    check_state `InTop "hint simplify" scope;
     if EcSection.in_section scope.sc_section then
       hierror "cannot add reduction rule in a section";
     let lemma    = fst (EcEnv.Ax.lookup (unloc name) (env scope)) in
