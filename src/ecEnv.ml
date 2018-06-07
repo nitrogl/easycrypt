@@ -1354,7 +1354,7 @@ module Reduction = struct
     let p =
       match rule.rl_ptn with
       | Rule ((p, _), _) -> p
-      | Var _ -> assert false
+      | Var _ | Int _ -> assert false
 
    in Mp.change (fun rls -> Some (odfl [] rls @ [rule])) p db
 
