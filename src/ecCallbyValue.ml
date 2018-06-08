@@ -4,7 +4,7 @@ open EcTypes
 open EcEnv
 open EcFol
 open EcReduction
-
+open EcBaseLogic
 module BI = EcBigInt
 
 (* -------------------------------------------------------------- *)
@@ -407,4 +407,13 @@ let norm_cbv (ri : reduction_info) hyps f =
       st_env  = LDecl.toenv hyps;
       st_ri   = ri
     } in
-  norm st subst_id f
+  (* compute the selected delta in hyps and push it into the subst *)
+  let add_hyp s (x,k) =
+    match k with
+    | LD_var (_, Some e) when ri.delta_h x ->
+      let v = cbv_init st s e in
+      bind_local s x v
+    | _ -> s in
+  let s =
+    List.fold_left add_hyp subst_id (List.rev (LDecl.tohyps hyps).h_local) in
+  norm st s f
