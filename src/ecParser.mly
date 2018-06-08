@@ -102,7 +102,7 @@
       { pbeta  = true; pzeta  = true;
         piota  = true; peta   = true;
         plogic = true; pdelta = None;
-        pmodpath = true }
+        pmodpath = true; puser = true; }
     else
       let doarg acc = function
         | `Delta l ->
@@ -116,14 +116,15 @@
         | `Eta     -> { acc with peta     = true }
         | `Logic   -> { acc with plogic   = true }
         | `ModPath -> { acc with pmodpath = true }
+        | `User    -> { acc with puser    = true }
       in
         List.fold_left doarg
           { pbeta  = false; pzeta  = false;
             piota  = false; peta   = false;
             plogic = false; pdelta = Some [];
-            pmodpath = false } l
+            pmodpath = false; puser = false; } l
 
-  let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath]
+  let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath; `User]
 
   let mk_pterm explicit head args =
     { fp_mode = if explicit then `Explicit else `Implicit;
@@ -2290,6 +2291,7 @@ simplify_arg:
 | ETA              { `Eta }
 | LOGIC            { `Logic }
 | MODPATH          { `ModPath }
+| HINT             { `User }
 
 simplify:
 | l=simplify_arg+     { l }
@@ -3375,17 +3377,33 @@ gprover_info:
     { { empty_pprover with pprov_cpufactor = Some t; } }
 
 addrw:
-| local=boption(LOCAL) HINT REWRITE p=lqident COLON l=lqident*
+| local=iboption(LOCAL) HINT REWRITE p=lqident COLON l=lqident*
     { (local, p, l) }
 
 hint:
-| local=boption(LOCAL) HINT EXACT base=lident? COLON l=qident*
+| local=iboption(LOCAL) HINT EXACT base=lident? COLON l=qident*
     { { ht_local = local; ht_prio  = 0;
         ht_base  = base ; ht_names = l; } }
 
-| local=boption(LOCAL) HINT SOLVE i=word base=lident? COLON l=qident*
+| local=iboption(LOCAL) HINT SOLVE i=word base=lident? COLON l=qident*
     { { ht_local = local; ht_prio  = i;
         ht_base  = base ; ht_names = l; } }
+
+(* -------------------------------------------------------------------- *)
+(* User reduction                                                       *)
+reduction:
+| HINT SIMPLIFY xs=plist1(user_red_info, COMMA)
+    { xs }
+
+user_red_info:
+| x=qident
+    { ([x], None) }
+
+| x=qident AT i=word
+    { ([x], Some i) }
+
+| xs=paren(plist1(qident, COMMA)) AT i=word
+    { (xs, Some i) }
 
 (* -------------------------------------------------------------------- *)
 (* Search pattern                                                       *)
@@ -3414,6 +3432,7 @@ global_action:
 | predicate        { Gpredicate   $1 }
 | notation         { Gnotation    $1 }
 | abbreviation     { Gabbrev      $1 }
+| reduction        { Greduction   $1 }
 | axiom            { Gaxiom       $1 }
 | tactics_or_prf   { Gtactics     $1 }
 | tactic_dump      { Gtcdump      $1 }

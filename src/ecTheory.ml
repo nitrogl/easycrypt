@@ -31,10 +31,24 @@ and theory_item =
   | Th_typeclass of (symbol * typeclass)
   | Th_baserw    of symbol
   | Th_addrw     of EcPath.path * EcPath.path list
+  | Th_reduction of (int * rule) list
   | Th_auto      of (bool * int * symbol option * path list)
 
 and tcinstance = [ `Ring of ring | `Field of field | `General of path ]
 and thmode     = [ `Abstract | `Concrete ]
+
+and rule_pattern =
+  | Rule of (EcPath.path * EcTypes.ty list) * rule_pattern list
+  | Int  of EcBigInt.zint
+  | Var  of EcIdent.t
+
+and rule = {
+  rl_tyd  : EcDecl.ty_params;
+  rl_vars : (EcIdent.t * EcTypes.ty) list;
+  rl_cond : EcCoreFol.form list;
+  rl_ptn  : rule_pattern;
+  rl_tg   : EcCoreFol.form;
+}
 
 (* -------------------------------------------------------------------- *)
 type ctheory = {
@@ -60,6 +74,7 @@ and ctheory_item =
   | CTh_typeclass of (symbol * typeclass)
   | CTh_baserw    of symbol
   | CTh_addrw     of EcPath.path * EcPath.path list
+  | CTh_reduction of (int * rule) list
   | CTh_auto      of (bool * int * symbol option * path list)
 
 and ctheory_clone = {

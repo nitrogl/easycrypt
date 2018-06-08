@@ -353,6 +353,7 @@ module TypeClass : sig
   val add_instance  : (ty_params * ty) -> tcinstance -> env -> env
   val get_instances : env -> ((ty_params * ty) * tcinstance) list
 end
+
 (* -------------------------------------------------------------------- *)
 module BaseRw : sig
   val by_path     : path -> env -> Sp.t
@@ -363,6 +364,15 @@ module BaseRw : sig
 
   val add   : symbol -> env -> env
   val addto : path -> path list -> env -> env
+end
+
+(* -------------------------------------------------------------------- *)
+module Reduction : sig
+  type rule = EcTheory.rule
+
+  val add1 : ?idx:int -> rule -> env -> env
+  val add  : (int * rule) list -> env -> env
+  val get  : path -> env -> rule list
 end
 
 (* -------------------------------------------------------------------- *)

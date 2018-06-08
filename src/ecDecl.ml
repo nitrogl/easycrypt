@@ -138,7 +138,8 @@ type axiom = {
   ax_tparams : ty_params;
   ax_spec    : EcCoreFol.form;
   ax_kind    : axiom_kind;
-  ax_nosmt   : bool; }
+  ax_nosmt   : bool;
+}
 
 let is_axiom (x : axiom_kind) = match x with `Axiom _ -> true | _ -> false
 let is_lemma (x : axiom_kind) = match x with `Lemma   -> true | _ -> false

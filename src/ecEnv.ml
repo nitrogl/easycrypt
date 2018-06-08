@@ -142,6 +142,7 @@ type preenv = {
   env_tc       : TC.graph;
   env_rwbase   : Sp.t Mip.t;
   env_atbase   : (path list Mint.t) Msym.t;
+  env_redbase  : redinfo Mp.t;
   env_ntbase   : (path * env_notation) list;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_item     : ctheory_item list;     (* in reverse order *)
@@ -160,6 +161,10 @@ and tcinstance = [
   | `Field   of EcDecl.field
   | `General of EcPath.path
 ]
+
+and redinfo =
+  { ri_priomap : (EcTheory.rule list) Mint.t;
+    ri_list    : (EcTheory.rule list) Lazy.t; }
 
 and env_notation = ty_params * EcDecl.notation
 
@@ -245,6 +250,7 @@ let empty gstate =
     env_tc       = TC.Graph.empty;
     env_rwbase   = Mip.empty;
     env_atbase   = Msym.empty;
+    env_redbase  = Mp.empty;
     env_ntbase   = [];
     env_modlcs   = Sid.empty;
     env_item     = [];
@@ -1035,7 +1041,8 @@ module MC = struct
       | CTh_baserw x ->
           (add2mc _up_rwbase x (expath x) mc, None)
 
-      | CTh_export _ | CTh_addrw _ | CTh_instance _ | CTh_auto _ ->
+      | CTh_export _ | CTh_addrw _ | CTh_instance _
+      | CTh_auto   _ | CTh_reduction _ ->
           (mc, None)
     in
 
@@ -1341,6 +1348,48 @@ module BaseRw = struct
             (IPPath p) env.env_rwbase;
         env_item = CTh_addrw (p, l) :: env.env_item; }
 
+end
+
+(* -------------------------------------------------------------------- *)
+module Reduction = struct
+  type rule = EcTheory.rule
+
+  let add_rule (idx : int) (rule : rule) (db : redinfo Mp.t) =
+    let p =
+      match rule.rl_ptn with
+      | Rule ((p, _), _) -> p
+      | Var _ | Int _ -> assert false in
+
+    Mp.change (fun rls ->
+      let { ri_priomap } =
+        match rls with
+        | None   -> { ri_priomap = Mint.empty; ri_list = Lazy.from_val [] }
+        | Some x -> x in
+
+      let ri_priomap =
+        let change prules = Some (odfl [] prules @ [rule]) in
+        Mint.change change idx ri_priomap in
+
+      let ri_list =
+        Lazy.from_fun (fun () -> List.flatten (Mint.values ri_priomap)) in
+
+      Some { ri_priomap; ri_list }) p db
+
+  let add_rules (rules : (int * rule) list) (db : redinfo Mp.t) =
+    List.fold_left ((^~) (curry add_rule)) db rules
+
+  let add (rules : (int * rule) list) (env : env) =
+    { env with
+        env_redbase = add_rules rules env.env_redbase;
+        env_item    = CTh_reduction rules :: env.env_item; }
+
+  let add1 ?(idx = 0) (rule : rule) (env : env) =
+    add [(idx, rule)] env
+
+  let get (p : EcPath.path) (env : env) =
+    Mp.find_opt p env.env_redbase
+      |> omap (fun x -> Lazy.force x.ri_list)
+      |> odfl []
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2695,6 +2744,7 @@ module Theory = struct
     | Th_instance  (ty, cr) -> CTh_instance  (ty, cr)
     | Th_baserw    x        -> CTh_baserw x
     | Th_addrw     (b, l)   -> CTh_addrw     (b, l)
+    | Th_reduction rule     -> CTh_reduction rule
     | Th_auto      ps       -> CTh_auto      ps
 
     | Th_theory (x, (th, md)) ->
@@ -2890,7 +2940,7 @@ module Theory = struct
         | CTh_baserw x ->
             MC.import_rwbase (xpath x) env
 
-        | CTh_addrw _ | CTh_instance _ | CTh_auto _ ->
+        | CTh_addrw _ | CTh_instance _ | CTh_auto _ | CTh_reduction _ ->
             env
 
       in
