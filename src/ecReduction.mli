@@ -81,6 +81,11 @@ val nodelta      : reduction_info
 val h_red_opt : reduction_info -> LDecl.hyps -> form -> form option
 val h_red     : reduction_info -> LDecl.hyps -> form -> form
 
+val reduce_user_gen :
+  (EcFol.form -> EcFol.form) ->
+  reduction_info ->
+  EcEnv.env -> EcEnv.LDecl.hyps -> EcFol.form -> EcFol.form
+
 val simplify : reduction_info -> LDecl.hyps -> form -> form
 
 val is_conv    : LDecl.hyps -> form -> form -> bool

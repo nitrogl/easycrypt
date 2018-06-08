@@ -653,7 +653,7 @@ and reduce_context ri env hyps f =
 
   | _ -> raise NotReducible
 
-and reduce_user ri env hyps f =
+and reduce_user_gen simplify ri env hyps f =
   if not ri.user then raise NotReducible;
 
   let (p, _), _ =
@@ -708,7 +708,7 @@ and reduce_user ri env hyps f =
       in
 
       List.iter (fun cond ->
-        if not (f_equal (simplify ri env hyps (subst cond)) f_true) then
+        if not (f_equal (simplify (subst cond)) f_true) then
           raise NotReducible)
         rule.R.rl_cond;
 
@@ -716,6 +716,9 @@ and reduce_user ri env hyps f =
 
     with NotReducible -> None)
   rules)
+
+and reduce_user ri env hyps f =
+  reduce_user_gen (simplify ri env hyps) ri env hyps f
 
 and can_eta x (f, args) =
   match List.rev args with
