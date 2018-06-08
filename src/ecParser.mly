@@ -3392,8 +3392,18 @@ hint:
 (* -------------------------------------------------------------------- *)
 (* User reduction                                                       *)
 reduction:
-| HINT SIMPLIFY x=qident
-    { x }
+| HINT SIMPLIFY xs=plist1(user_red_info, COMMA)
+    { xs }
+
+user_red_info:
+| x=qident
+    { ([x], None) }
+
+| x=qident AT i=word
+    { ([x], Some i) }
+
+| xs=paren(plist1(qident, COMMA)) AT i=word
+    { (xs, Some i) }
 
 (* -------------------------------------------------------------------- *)
 (* Search pattern                                                       *)

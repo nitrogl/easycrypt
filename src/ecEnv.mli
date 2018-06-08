@@ -370,8 +370,9 @@ end
 module Reduction : sig
   type rule = EcTheory.rule
 
-  val add : rule -> env -> env
-  val get : path -> env -> rule list
+  val add1 : ?idx:int -> rule -> env -> env
+  val add  : (int * rule) list -> env -> env
+  val get  : path -> env -> rule list
 end
 
 (* -------------------------------------------------------------------- *)

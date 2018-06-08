@@ -425,7 +425,7 @@ and replay_auto
 
 (* -------------------------------------------------------------------- *)
 and replay_reduction
-  (_ove : _ ovrenv) (subst, ops, proofs, scope) (_ : EcTheory.rule)
+  (_ove : _ ovrenv) (subst, ops, proofs, scope) (_ : (int * EcTheory.rule) list)
 =
   (subst, ops, proofs, scope)
 

@@ -31,7 +31,7 @@ and theory_item =
   | Th_typeclass of (symbol * typeclass)
   | Th_baserw    of symbol
   | Th_addrw     of EcPath.path * EcPath.path list
-  | Th_reduction of rule
+  | Th_reduction of (int * rule) list
   | Th_auto      of (bool * int * symbol option * path list)
 
 and tcinstance = [ `Ring of ring | `Field of field | `General of path ]
@@ -74,7 +74,7 @@ and ctheory_item =
   | CTh_typeclass of (symbol * typeclass)
   | CTh_baserw    of symbol
   | CTh_addrw     of EcPath.path * EcPath.path list
-  | CTh_reduction of rule
+  | CTh_reduction of (int * rule) list
   | CTh_auto      of (bool * int * symbol option * path list)
 
 and ctheory_clone = {

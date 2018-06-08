@@ -142,7 +142,7 @@ type preenv = {
   env_tc       : TC.graph;
   env_rwbase   : Sp.t Mip.t;
   env_atbase   : (path list Mint.t) Msym.t;
-  env_redbase  : (EcTheory.rule list) Mp.t;
+  env_redbase  : redinfo Mp.t;
   env_ntbase   : (path * env_notation) list;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_item     : ctheory_item list;     (* in reverse order *)
@@ -161,6 +161,10 @@ and tcinstance = [
   | `Field   of EcDecl.field
   | `General of EcPath.path
 ]
+
+and redinfo =
+  { ri_priomap : (EcTheory.rule list) Mint.t;
+    ri_list    : (EcTheory.rule list) Lazy.t; }
 
 and env_notation = ty_params * EcDecl.notation
 
@@ -1350,21 +1354,42 @@ end
 module Reduction = struct
   type rule = EcTheory.rule
 
-  let add_rule (rule : rule) (db : (rule list) Mp.t) =
+  let add_rule (idx : int) (rule : rule) (db : redinfo Mp.t) =
     let p =
       match rule.rl_ptn with
       | Rule ((p, _), _) -> p
-      | Var _ | Int _ -> assert false
+      | Var _ | Int _ -> assert false in
 
-   in Mp.change (fun rls -> Some (odfl [] rls @ [rule])) p db
+    Mp.change (fun rls ->
+      let { ri_priomap } =
+        match rls with
+        | None   -> { ri_priomap = Mint.empty; ri_list = Lazy.from_val [] }
+        | Some x -> x in
 
-  let add (rule : rule) (env : env) =
+      let ri_priomap =
+        let change prules = Some (odfl [] prules @ [rule]) in
+        Mint.change change idx ri_priomap in
+
+      let ri_list =
+        Lazy.from_fun (fun () -> List.flatten (Mint.values ri_priomap)) in
+
+      Some { ri_priomap; ri_list }) p db
+
+  let add_rules (rules : (int * rule) list) (db : redinfo Mp.t) =
+    List.fold_left ((^~) (curry add_rule)) db rules
+
+  let add (rules : (int * rule) list) (env : env) =
     { env with
-        env_redbase = add_rule rule env.env_redbase;
-        env_item    = CTh_reduction rule :: env.env_item; }
+        env_redbase = add_rules rules env.env_redbase;
+        env_item    = CTh_reduction rules :: env.env_item; }
+
+  let add1 ?(idx = 0) (rule : rule) (env : env) =
+    add [(idx, rule)] env
 
   let get (p : EcPath.path) (env : env) =
-    Mp.find_def [] p env.env_redbase
+    Mp.find_opt p env.env_redbase
+      |> omap (fun x -> Lazy.force x.ri_list)
+      |> odfl []
 end
 
 (* -------------------------------------------------------------------- *)

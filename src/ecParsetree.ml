@@ -1038,6 +1038,9 @@ type phint = {
 }
 
 (* -------------------------------------------------------------------- *)
+type puserred = (pqsymbol list * int option) list
+
+(* -------------------------------------------------------------------- *)
 type global_action =
   | Gdeclare     of pdeclare
   | Gmodule      of pmodule_def
@@ -1051,7 +1054,7 @@ type global_action =
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gaddrw       of (bool * pqsymbol * pqsymbol list)
-  | Greduction   of pqsymbol
+  | Greduction   of puserred
   | Ghint        of phint
   | Gprint       of pprint
   | Gsearch      of pformula list

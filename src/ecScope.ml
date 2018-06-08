@@ -2114,13 +2114,23 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Reduction = struct
-  let add_reduction scope name =
+  let add_reduction scope reds =
     check_state `InTop "hint simplify" scope;
     if EcSection.in_section scope.sc_section then
       hierror "cannot add reduction rule in a section";
-    let lemma    = fst (EcEnv.Ax.lookup (unloc name) (env scope)) in
-    let red_info = EcReduction.User.compile (env scope) lemma in
-    { scope with sc_env = EcEnv.Reduction.add red_info (env scope) }
+
+    let rules =
+      let for1 idx name =
+        let lemma    = fst (EcEnv.Ax.lookup (unloc name) (env scope)) in
+        let red_info = EcReduction.User.compile (env scope) lemma in
+        (odfl 0 idx, red_info) in
+
+      let rules = List.map (fun (xs, idx) -> List.map (for1 idx) xs) reds in
+      List.flatten rules
+
+    in
+
+    { scope with sc_env = EcEnv.Reduction.add rules (env scope) }
 end
 
 (* -------------------------------------------------------------------- *)
