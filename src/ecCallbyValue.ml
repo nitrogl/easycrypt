@@ -166,7 +166,7 @@ and betared st s bd f args =
 
 and app_red st f1 args =
   match f1.f_node, args with
-  | _, Aempty _ -> f1
+(*  | _, Aempty _ -> f1 *)
   (* β-reduction *)
   | Fquant(Llambda, bd, f2), _ when st.st_ri.beta ->
     betared st subst_id bd f2 args
@@ -225,7 +225,7 @@ and app_red st f1 args =
 
 and reduce_user st f =
   match reduce_user_gen (cbv_init st subst_id) st.st_ri st.st_env st.st_hyps f with
-  | f -> reduce_user st f
+  | f -> cbv_init st subst_id f
   | exception NotReducible -> f
 
 and cbv_init st s f =
