@@ -221,7 +221,7 @@ end
 
 (*-------------------------------------------------------------------- *)
 module Reduction : sig
-  val add_reduction : scope -> pqsymbol -> scope
+  val add_reduction : scope -> puserred -> scope
 end
 
 (* -------------------------------------------------------------------- *)
