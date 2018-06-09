@@ -11,11 +11,15 @@ open EcUtils
 open EcParsetree
 open EcTypes
 open EcModules
+open EcFol
+open EcReduction
 open EcEnv
 open EcPV
 
 open EcCoreGoal
 open EcLowPhlGoal
+open EcPhlRCond
+open EcLowGoal
 
 module Zpr = EcMatching.Zipper
 module TTC = EcProofTyping
@@ -23,7 +27,7 @@ module TTC = EcProofTyping
 (* -------------------------------------------------------------------- *)
 type fission_t    = oside * codepos * (int * (int * int))
 type fusion_t     = oside * codepos * (int * (int * int))
-type unroll_t     = oside * codepos
+type unroll_t     = oside * codepos * bool
 type splitwhile_t = pexpr * oside * codepos
 
 (* -------------------------------------------------------------------- *)
@@ -186,11 +190,95 @@ let process_fission (side, cpos, infos) tc =
 let process_fusion (side, cpos, infos) tc =
   t_fusion side cpos infos tc
 
-let process_unroll (side, cpos) tc =
-  t_unroll side cpos tc
-
 let process_splitwhile (b, side, cpos) tc =
   let b =
     try  TTC.tc1_process_Xhl_exp tc side (Some tbool) b
     with EcFol.DestrError _ -> tc_error !!tc "goal must be a *HL statement"
   in t_splitwhile b side cpos tc
+
+(* -------------------------------------------------------------------- *)
+let process_unroll_for side cpos tc =
+  let pos = fst cpos in
+  if snd cpos <> None then tc_error !!tc "invalid position";
+  let env = FApi.tc1_env tc in
+  let hyps = FApi.tc1_hyps tc in
+  let c = EcLowPhlGoal.get_stmt side tc in
+  let z = Zpr.zipper_of_cpos cpos c in
+  let x, z0 =
+    match z.Zpr.z_head with
+    | {i_node = Sasgn (LvVar(x,_), {e_node = Eint z0})} :: _ -> x, z0
+    | _ -> tc_error !!tc "invalid first instruction before while" in
+
+  let t, wbody  =
+    match z.Zpr.z_tail with
+    | {i_node = Swhile (t, wc)} :: _ -> t, wc
+    | _ -> tc_error !!tc "no while at the given position" in
+  let eincr =
+    match List.rev wbody.s_node with
+    | {i_node = Sasgn (LvVar(x',_), e)} :: tl when pv_equal x x' ->
+      if PV.mem_pv env x (is_write_r env PV.empty (List.rev tl)) then
+        tc_error !!tc "the loop body modify the counter";
+      e
+    | _ -> tc_error !!tc "invalid last instruction of the loop body" in
+  let fincr = form_of_expr mhr eincr in
+  let incrz z0 =
+    let f = PVM.subst1 env x mhr (f_int z0) fincr in
+    match (simplify full_red hyps f).f_node with
+    | Fint z0 -> z0
+    | _       -> tc_error !!tc "cannot evaluate increment" in
+  let ftest = form_of_expr mhr t in
+  let test_cond z0 =
+    let f = simplify full_red hyps (PVM.subst1 env x mhr (f_int z0) ftest) in
+    if f_equal f f_true then true
+    else if f_equal f f_false then false
+    else tc_error !!tc "cannot evaluate condition" in
+  let rec eval_cond z0 =
+    if test_cond z0 then z0 :: eval_cond (incrz z0)
+    else [z0] in
+  let bodylen = List.length wbody.s_node in
+  let zs = eval_cond z0 in
+  let handles = Array.make (List.length zs) None in
+  let m = LDecl.fresh_id hyps "&m" in
+  let x = f_pvar x tint mhr in
+  let t_set i pos z tc =
+    let h = FApi.tc1_handle tc in
+    handles.(i) <- Some (h,pos,z);
+    t_id tc in
+  let t_conseq post tc =
+    (EcPhlConseq.t_conseq (tc1_get_pre tc) post @+
+    [ t_trivial; t_trivial; t_id]) tc in
+
+  let rec t_doit i pos zs tc =
+    match zs with
+    | [] -> t_id tc
+    | z :: zs ->
+      ((t_rcond side (zs <> []) pos) @+
+      [t_intro_i m @!
+       t_conseq (f_eq x (f_int z)) @!
+       t_set i pos z;
+       t_doit (i+1) (pos + bodylen) zs]) tc in
+  let t_conseq_nm tc =
+    (EcPhlConseq.t_hoareS_conseq_nm (tc1_get_pre tc) f_true @+
+    [ t_trivial; t_trivial; EcPhlTAuto.t_hoare_true]) tc in
+  let doi i tc =
+    if Array.length handles <= i then t_id tc
+    else
+      let (_h,pos,_z) = oget handles.(i) in
+      if i = 0 then
+        (EcPhlWp.t_wp (Some (Single (pos-2))) @!
+         t_conseq f_true @! EcPhlTAuto.t_hoare_true) tc
+      else
+        let (h', pos', z') = oget handles.(i-1) in
+        FApi.t_seqs [
+          EcPhlWp.t_wp (Some (Single (pos-2)));
+          EcPhlApp.t_hoare_app (pos' - 1) (f_eq x (f_int z')) @+
+          [t_apply_hd h'; t_conseq_nm] ] tc
+  in
+
+  let tcenv = t_doit 0 pos zs tc in
+  FApi.t_onalli doi tcenv
+
+
+let process_unroll (side, cpos, for_) tc =
+  if for_ then process_unroll_for side cpos tc
+  else t_unroll side cpos tc
