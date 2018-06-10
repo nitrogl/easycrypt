@@ -4,7 +4,7 @@ open EcTypes
 open EcEnv
 open EcFol
 open EcReduction
-
+open EcBaseLogic
 module BI = EcBigInt
 
 (* -------------------------------------------------------------- *)
@@ -36,7 +36,6 @@ let f_ands_simpl fs =
   | f::fs -> f_ands_simpl (List.rev fs) f
 
 let rec f_eq_simpl st f1 f2 =
-  Format.eprintf "eq_simpl@.";
   if f_equal f1 f2 then f_true
   else match f1.f_node, f2.f_node with
   | Fapp({f_node = Fop (p1, _)}, args1),
@@ -63,7 +62,6 @@ let rec f_eq_simpl st f1 f2 =
 
 (* -------------------------------------------------------------- *)
 let rec f_map_get_simpl st m x bty =
-  Format.eprintf "get_simpl@.";
   match m.f_node with
   | Fapp({f_node = Fop(p,_)}, [e])
     when EcPath.p_equal p EcCoreLib.CI_Map.p_cst ->
@@ -81,7 +79,6 @@ let rec f_map_get_simpl st m x bty =
   | _ -> f_map_get m x bty
 
 and f_map_set_simplify st m x =
-  Format.eprintf "set_simpl@.";
   match m.f_node with
   | Fapp({f_node = Fop(p, _)}, [m'; x'; e])
     when EcPath.p_equal p EcCoreLib.CI_Map.p_set ->
@@ -169,7 +166,7 @@ and betared st s bd f args =
 
 and app_red st f1 args =
   match f1.f_node, args with
-  | _, Aempty _ -> f1
+(*  | _, Aempty _ -> f1 *)
   (* β-reduction *)
   | Fquant(Llambda, bd, f2), _ when st.st_ri.beta ->
     betared st subst_id bd f2 args
@@ -217,12 +214,19 @@ and app_red st f1 args =
     | Some (`Eq       ), [f1;f2] -> f_eq_simpl st f1 f2
     | Some (`Map_get  ), [f1;f2] ->
       f_map_get_simpl st f1 f2 (snd (as_seq2 tys))
-    | _, _ -> f_app f1 args ty
+    | _, _ ->
+      reduce_user st (f_app f1 args ty)
     end
   (* FIXME: reduction of fixpoint *)
   | _ ->
     let args, ty = flatten_args args in
-    f_app f1 args ty
+    reduce_user st (f_app f1 args ty)
+
+
+and reduce_user st f =
+  match reduce_user_gen (cbv_init st subst_id) st.st_ri st.st_env st.st_hyps f with
+  | f -> cbv_init st subst_id f
+  | exception NotReducible -> f
 
 and cbv_init st s f =
   cbv st s f (Aempty (Fsubst.subst_ty s f.f_ty))
@@ -407,4 +411,13 @@ let norm_cbv (ri : reduction_info) hyps f =
       st_env  = LDecl.toenv hyps;
       st_ri   = ri
     } in
-  norm st subst_id f
+  (* compute the selected delta in hyps and push it into the subst *)
+  let add_hyp s (x,k) =
+    match k with
+    | LD_var (_, Some e) when ri.delta_h x ->
+      let v = cbv_init st s e in
+      bind_local s x v
+    | _ -> s in
+  let s =
+    List.fold_left add_hyp subst_id (List.rev (LDecl.tohyps hyps).h_local) in
+  norm st s f
