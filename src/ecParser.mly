@@ -2716,8 +2716,8 @@ phltactic:
 | FUSION s=side? o=codepos NOT i=word AT d1=word COMMA d2=word
     { Pfusion (s, o, (i, (d1, d2))) }
 
-| UNROLL s=side? o=codepos
-    { Punroll (s, o) }
+| UNROLL s=side? o=codepos f=STAR?
+    { Punroll (s, o, f <> None) }
 
 | SPLITWHILE s=side? o=codepos COLON c=expr %prec prec_tactic
     { Psplitwhile (c, s, o) }
