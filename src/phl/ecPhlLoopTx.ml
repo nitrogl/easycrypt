@@ -198,52 +198,72 @@ let process_splitwhile (b, side, cpos) tc =
 
 (* -------------------------------------------------------------------- *)
 let process_unroll_for side cpos tc =
-  let pos = fst cpos in
-  if snd cpos <> None then tc_error !!tc "invalid position";
-  let env = FApi.tc1_env tc in
-  let hyps = FApi.tc1_hyps tc in
-  let c = EcLowPhlGoal.get_stmt side tc in
-  let z = Zpr.zipper_of_cpos cpos c in
-  let x, z0 =
-    match z.Zpr.z_head with
-    | {i_node = Sasgn (LvVar(x,_), {e_node = Eint z0})} :: _ -> x, z0
-    | _ -> tc_error !!tc "invalid first instruction before while" in
+  if snd cpos <> None then
+    tc_error !!tc "cannot use deep code position";
 
+  let pos  = fst cpos in
+  let env  = FApi.tc1_env tc in
+  let hyps = FApi.tc1_hyps tc in
+  let c    = EcLowPhlGoal.tc1_get_stmt side tc in
+  let z    = Zpr.zipper_of_cpos cpos c in
+
+  (* Extract loop condition / body *)
   let t, wbody  =
-    match z.Zpr.z_tail with
-    | {i_node = Swhile (t, wc)} :: _ -> t, wc
-    | _ -> tc_error !!tc "no while at the given position" in
+    match List.ohead z.Zpr.z_tail |> omap i_node with
+    | Some (Swhile (t, wc)) -> t, wc
+    | _ -> tc_error !!tc "the position must target a while loop" in
+
+  (* Extract loop counter increment *)
+  let x, z0 =
+    match List.ohead z.Zpr.z_head |> omap i_node with
+    | Some (Sasgn (LvVar (x, _), { e_node = Eint z0 })) -> x, z0
+    | _ -> tc_error !!tc
+             "the while loop must be preceded by an integer"
+             "counter (constant) initialization" in
+
+  (* Extract increment *)
   let eincr =
     match List.rev wbody.s_node with
-    | {i_node = Sasgn (LvVar(x',_), e)} :: tl when pv_equal x x' ->
-      if PV.mem_pv env x (is_write_r env PV.empty (List.rev tl)) then
-        tc_error !!tc "the loop body modify the counter";
-      e
-    | _ -> tc_error !!tc "invalid last instruction of the loop body" in
-  let fincr = form_of_expr mhr eincr in
-  let incrz z0 =
-    let f = PVM.subst1 env x mhr (f_int z0) fincr in
-    match (simplify full_red hyps f).f_node with
-    | Fint z0 -> z0
-    | _       -> tc_error !!tc "cannot evaluate increment" in
-  let ftest = form_of_expr mhr t in
-  let test_cond z0 =
-    let f = simplify full_red hyps (PVM.subst1 env x mhr (f_int z0) ftest) in
-    if f_equal f f_true then true
-    else if f_equal f f_false then false
-    else tc_error !!tc "cannot evaluate condition" in
+    | { i_node = Sasgn (LvVar (x', _), e) } :: tl when pv_equal x x' ->
+        if PV.mem_pv env x (is_write_r env PV.empty (List.rev tl)) then
+          tc_error !!tc "the loop body must not modify the loop counter";
+        e
+
+    | _ -> tc_error !!tc
+             "last instruction of the while loop must be"
+             "an \"increment\" of the loop counter" in
+
+  (* Apply loop increment *)
+  let incrz =
+    let fincr = form_of_expr mhr eincr in
+    fun z0 ->
+      let f = PVM.subst1 env x mhr (f_int z0) fincr in
+      match (simplify full_red hyps f).f_node with
+      | Fint z0 -> z0
+      | _       -> tc_error !!tc "loop increment does not reduce to a constant" in
+
+  (* Evaluate loop guard *)
+  let test_cond =
+    let ftest = form_of_expr mhr t in
+    fun z0 ->
+      let cond = PVM.subst1 env x mhr (f_int z0) ftest in
+      match sform_of_form (simplify full_red hyps cond) with
+      | SFtrue  -> true
+      | SFfalse -> false
+      | _       -> tc_error !!tc "while loop condition does not reduce to a constant" in
+
   let rec eval_cond z0 =
-    if test_cond z0 then z0 :: eval_cond (incrz z0)
-    else [z0] in
-  let bodylen = List.length wbody.s_node in
-  let zs = eval_cond z0 in
-  let handles = Array.make (List.length zs) None in
-  let m = LDecl.fresh_id hyps "&m" in
-  let x = f_pvar x tint mhr in
+    if test_cond z0 then z0 :: eval_cond (incrz z0) else [z0] in
+
+  let blen = List.length wbody.s_node in
+  let zs   = eval_cond z0 in
+  let hds  = Array.make (List.length zs) None in
+  let m    = LDecl.fresh_id hyps "&m" in
+  let x    = f_pvar x tint mhr in
+
   let t_set i pos z tc =
-    let h = FApi.tc1_handle tc in
-    handles.(i) <- Some (h,pos,z);
-    t_id tc in
+    hds.(i) <- Some (FApi.tc1_handle tc, pos, z); t_id tc in
+
   let t_conseq post tc =
     (EcPhlConseq.t_conseq (tc1_get_pre tc) post @+
     [ t_trivial; t_trivial; t_id]) tc in
@@ -256,29 +276,30 @@ let process_unroll_for side cpos tc =
       [t_intro_i m @!
        t_conseq (f_eq x (f_int z)) @!
        t_set i pos z;
-       t_doit (i+1) (pos + bodylen) zs]) tc in
+       t_doit (i+1) (pos + blen) zs]) tc in
+
   let t_conseq_nm tc =
     (EcPhlConseq.t_hoareS_conseq_nm (tc1_get_pre tc) f_true @+
     [ t_trivial; t_trivial; EcPhlTAuto.t_hoare_true]) tc in
+
   let doi i tc =
-    if Array.length handles <= i then t_id tc
+    if Array.length hds <= i then t_id tc else
+    let (_h,pos,_z) = oget hds.(i) in
+    if i = 0 then
+      (EcPhlWp.t_wp (Some (Single (pos-2))) @!
+       t_conseq f_true @! EcPhlTAuto.t_hoare_true) tc
     else
-      let (_h,pos,_z) = oget handles.(i) in
-      if i = 0 then
-        (EcPhlWp.t_wp (Some (Single (pos-2))) @!
-         t_conseq f_true @! EcPhlTAuto.t_hoare_true) tc
-      else
-        let (h', pos', z') = oget handles.(i-1) in
-        FApi.t_seqs [
-          EcPhlWp.t_wp (Some (Single (pos-2)));
-          EcPhlApp.t_hoare_app (pos' - 1) (f_eq x (f_int z')) @+
-          [t_apply_hd h'; t_conseq_nm] ] tc
+      let (h', pos', z') = oget hds.(i-1) in
+      FApi.t_seqs [
+        EcPhlWp.t_wp (Some (Single (pos-2)));
+        EcPhlApp.t_hoare_app (pos' - 1) (f_eq x (f_int z')) @+
+        [t_apply_hd h'; t_conseq_nm] ] tc
   in
 
-  let tcenv = t_doit 0 pos zs tc in
-  FApi.t_onalli doi tcenv
+  let tcenv = t_doit 0 pos zs tc in FApi.t_onalli doi tcenv
 
-
+(* -------------------------------------------------------------------- *)
 let process_unroll (side, cpos, for_) tc =
-  if for_ then process_unroll_for side cpos tc
+  if   for_
+  then process_unroll_for side cpos tc
   else t_unroll side cpos tc
