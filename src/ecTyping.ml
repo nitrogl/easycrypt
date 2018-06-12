@@ -67,6 +67,9 @@ type funapp_error =
 type mem_error =
 | MAE_IsConcrete
 
+type filter_error =
+| FE_InvalidIndex of int
+
 type tyerror =
 | UniVarNotAllowed
 | FreeTypeVariables
@@ -108,6 +111,7 @@ type tyerror =
 | InvalidModType         of modtyp_error
 | InvalidModSig          of modsig_error
 | InvalidMem             of symbol * mem_error
+| InvalidFilter          of filter_error
 | FunNotInModParam       of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
@@ -2153,14 +2157,23 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
 
             let filter1 (fs : form list) (i, j) =
               let n = List.length fs in
-              let norm k = if k mod n < 0 then k mod n + n else k in
+              let norm (x as ox) =
+                let x =
+                  match x with
+                  | x when 0 < x && x  <= n -> Some (x - 1)
+                  | x when x < 0 && -n <= x -> Some (n + x)
+                  | _ -> None in
+
+                match x with
+                | None   -> tyerror loc env (InvalidFilter (FE_InvalidIndex ox))
+                | Some x -> x in
 
               match
                 match i, j with
                 | None  , None   -> `Range  (0, n)
                 | Some i, None   -> `Single (norm i)
                 | None  , Some j -> `Single (norm j)
-                | Some i, Some j -> `Range  (norm i, norm j)
+                | Some i, Some j -> `Range  (norm i, norm j + 1)
               with
               | `Single k        -> [List.nth fs k]
               | `Range  (k1, k2) -> List.take (k2 - k1) (List.drop k1 fs) in

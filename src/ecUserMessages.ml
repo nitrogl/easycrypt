@@ -323,6 +323,9 @@ end = struct
     | InvalidMem (name, MAE_IsConcrete) ->
         msg "the memory %s must be abstract" name
 
+    | InvalidFilter (FE_InvalidIndex i) ->
+        msg "invalid filter index: %d" i
+
     | FunNotInModParam name ->
         msg "the function %a is not provided by a module parameter"
           pp_qsymbol name
