@@ -58,6 +58,9 @@ type funapp_error =
 type mem_error =
 | MAE_IsConcrete
 
+type filter_error =
+| FE_InvalidIndex of int
+
 type tyerror =
 | UniVarNotAllowed
 | FreeTypeVariables
@@ -99,6 +102,7 @@ type tyerror =
 | InvalidModType         of modtyp_error
 | InvalidModSig          of modsig_error
 | InvalidMem             of symbol * mem_error
+| InvalidFilter          of filter_error
 | FunNotInModParam       of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
