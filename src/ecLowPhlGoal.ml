@@ -166,6 +166,21 @@ let tc1_as_equivS   tc = pf_as_equivS   !!tc (FApi.tc1_goal tc)
 let tc1_as_eagerF   tc = pf_as_eagerF   !!tc (FApi.tc1_goal tc)
 
 (* -------------------------------------------------------------------- *)
+let tc1_get_stmt side tc =
+  let concl = FApi.tc1_goal tc in
+  match side, concl.f_node with
+  | None, FhoareS hs -> hs.hs_s
+  | None, FbdHoareS hs -> hs.bhs_s
+  | Some _ , (FhoareS _ | FbdHoareS _) ->
+      tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt] !!tc
+  | Some `Left, FequivS es   -> es.es_sl
+  | Some `Right, FequivS es  -> es.es_sr
+  | None, FequivS _ ->
+      tc_error_noXhl ~kinds:[`Equiv `Stmt] !!tc
+  | _            ->
+      tc_error_noXhl ~kinds:(hlkinds_Xhl_r `Stmt) !!tc
+
+(* -------------------------------------------------------------------- *)
 let get_pre f =
   match f.f_node with
   | FhoareF hf   -> Some (hf.hf_pr )
@@ -447,7 +462,6 @@ let generalize_mod_ env m modi f =
 
   (* 3.a. Add the global variables *)
 
-(*  let scheck = proj3_3 (generalize_subst_ env m melts mglob )in *)
   let (bd', bd, s ) = generalize_subst_ env m uelts uglob in
    (* 3.b. Check that the modify variables does not clash with
            the variables not generalized *)

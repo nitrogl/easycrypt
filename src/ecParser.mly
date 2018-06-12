@@ -2041,6 +2041,16 @@ ipsubsttop:
 | LTLTSTARGT { Some `RtoL }
 | LTSTARGTGT { Some `LtoR }
 
+crushmode:
+| PIPEGT { { cm_simplify = false; cm_solve = false; } }
+
+| SLASHGT { { cm_simplify = true ; cm_solve = false; } }
+
+| PIPEPIPEGT { { cm_simplify = false; cm_solve = true ; } }
+
+| SLASHSLASHGT { { cm_simplify = true ; cm_solve = true ; } }
+
+
 intro_pattern:
 | x=ipcore
    { IPCore x }
@@ -2108,17 +2118,8 @@ intro_pattern:
 | MINUS
    { IPBreak }
 
-| PIPEGT
-   { IPCrush { cm_simplify = false; cm_solve = false; } }
-
-| SLASHGT
-   { IPCrush { cm_simplify = true ; cm_solve = false; } }
-
-| PIPEPIPEGT
-   { IPCrush { cm_simplify = false; cm_solve = true ; } }
-
-| SLASHSLASHGT
-   { IPCrush { cm_simplify = true ; cm_solve = true ; } }
+| cm=crushmode
+   { IPCrush cm }
 
 gpterm_head(F):
 | exp=iboption(AT) p=qident tvi=tvars_app?
@@ -2705,8 +2706,8 @@ phltactic:
 | FUSION s=side? o=codepos NOT i=word AT d1=word COMMA d2=word
     { Pfusion (s, o, (i, (d1, d2))) }
 
-| UNROLL s=side? o=codepos
-    { Punroll (s, o) }
+| UNROLL b=boption(FOR) s=side? o=codepos
+    { Punroll (s, o, b) }
 
 | SPLITWHILE s=side? o=codepos COLON c=expr %prec prec_tactic
     { Psplitwhile (c, s, o) }
@@ -2743,6 +2744,8 @@ phltactic:
 
 | CONSEQ cq=cqoptions? UNDERSCORE UNDERSCORE info3=gpterm(conseq_bd)
     { Pconseq (odfl [] cq, (None,None,Some info3)) }
+
+| CONSEQ cm=crushmode { Pconseqauto cm }
 
 | ELIM STAR
     { Phrex_elim }

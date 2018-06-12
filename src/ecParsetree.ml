@@ -555,6 +555,9 @@ type pcqoption  = [ `Frame ]
 type pcqoptions = (bool * pcqoption) list
 
 (* -------------------------------------------------------------------- *)
+type crushmode = { cm_simplify : bool; cm_solve : bool; }
+
+(* -------------------------------------------------------------------- *)
 type phltactic =
   | Pskip
   | Prepl_stmt     of trans_info
@@ -566,7 +569,7 @@ type phltactic =
   | Pasyncwhile    of async_while_info
   | Pfission       of (oside * codepos * (int * (int * int)))
   | Pfusion        of (oside * codepos * (int * (int * int)))
-  | Punroll        of (oside * codepos)
+  | Punroll        of (oside * codepos * bool)
   | Psplitwhile    of (pexpr * oside * codepos)
   | Pcall          of oside * call_info gppterm
   | Prcond         of (oside * bool * int)
@@ -579,6 +582,7 @@ type phltactic =
   | Palias         of (oside * codepos * osymbol_r)
   | Pset           of (oside * codepos * bool * psymbol * pexpr)
   | Pconseq        of (pcqoptions * (conseq_ppterm option tuple3))
+  | Pconseqauto    of crushmode
   | Phrex_elim
   | Phrex_intro    of pformula list
   | Pexfalso
@@ -722,7 +726,7 @@ and ipcore = [
 and icasemode =
   [`One | `Full of (bool * bool) * icasemode_full option]
 
-and crushmode = { cm_simplify : bool; cm_solve : bool; }
+
 
 and icasemode_full =
   [`AtMost of int | `AsMuch]
