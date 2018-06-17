@@ -104,7 +104,6 @@ let f_real_div f1 f2 =
   f_real_mul f1 (f_real_inv f2)
 
 (* -------------------------------------------------------------------- *)
-
 let tmap aty bty =
   tconstr CI.CI_Map.p_map [aty; bty]
 
@@ -439,6 +438,12 @@ let f_and_simpl f1 f2 =
   else f_and f1 f2
 
 let f_ands_simpl = List.fold_right f_and_simpl
+
+let f_ands0_simpl fs =
+  match List.rev fs with
+  | [] -> f_true
+  | [x] -> x
+  | f::fs -> f_ands_simpl (List.rev fs) f
 
 let f_anda_simpl f1 f2 =
   if is_true f1 then f2
