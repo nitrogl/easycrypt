@@ -218,13 +218,14 @@ and app_red st f1 args =
       let v = oget (EcEnv.Op.by_path_opt p st.st_env) in
       let v = proj3_2 (EcDecl.operator_as_proj v) in
       app_red st (List.nth mkargs v) args1
+
     | _ ->
       let args, ty = flatten_args args in
       f_app f1 args ty
   end
 
   (* logical reduction *)
-  | Fop(p,tys), _ when is_some st.st_ri.logic && is_logical_op p ->
+  | Fop (p, tys), _ when is_some st.st_ri.logic && is_logical_op p ->
     let pcompat =
       match st.st_ri.logic with Some `Full -> true | _ -> false
     in
@@ -250,20 +251,80 @@ and app_red st f1 args =
     | Some (`Real_mul ), [f1;f2] -> f_real_mul_simpl f1 f2
     | Some (`Real_inv ), [f]     -> f_real_inv_simpl f
     | Some (`Eq       ), [f1;f2] -> f_eq_simpl st f1 f2
-    | Some (`Map_get  ), [f1;f2] ->
-      f_map_get_simpl st f1 f2 (snd (as_seq2 tys))
-    | _, _ ->
-      reduce_user st (f_app f1 args ty)
+    | Some (`Map_get  ), [f1;f2] -> f_map_get_simpl st f1 f2 (snd (as_seq2 tys))
+
+    | _, _ -> reduce_user st (f_app f1 args ty)
     end
 
-  (* FIXME: reduction of fixpoint *)
+  (* fix-def reduction *)
+  | Fop (p, tys), _
+      when st.st_ri.iota && EcEnv.Op.is_fix_def st.st_env p
+    -> begin
+    let module E = struct exception NoCtor end in
+
+    let args, ty = flatten_args args in
+
+    try
+      let op  = oget (EcEnv.Op.by_path_opt p st.st_env) in
+      let fix = EcDecl.operator_as_fix op in
+
+        if List.length args <> snd (fix.EcDecl.opf_struct) then
+          raise E.NoCtor;
+
+      let vargs = Array.of_list args in
+      let pargs = List.fold_left (fun (opb, acc) v ->
+          let v = vargs.(v) in
+
+            match fst_map (fun x -> x.f_node) (EcFol.destr_app v) with
+            | (Fop (p, _), cargs) when EcEnv.Op.is_dtype_ctor st.st_env p -> begin
+                let idx = EcEnv.Op.by_path p st.st_env in
+                let idx = snd (EcDecl.operator_as_ctor idx) in
+                  match opb with
+                  | EcDecl.OPB_Leaf   _  -> assert false
+                  | EcDecl.OPB_Branch bs ->
+                     ((Parray.get bs idx).EcDecl.opb_sub, cargs :: acc)
+              end
+            | _ -> raise E.NoCtor)
+        (fix.EcDecl.opf_branches, []) (fst fix.EcDecl.opf_struct)
+      in
+
+      let pargs, (bds, body) =
+        match pargs with
+        | EcDecl.OPB_Leaf (bds, body), cargs -> (List.rev cargs, (bds, body))
+        | _ -> assert false
+      in
+
+      let subst =
+        List.fold_left2
+          (fun subst (x, _) fa -> Subst.bind_local subst x fa)
+          Subst.subst_id fix.EcDecl.opf_args args in
+
+      let subst =
+        List.fold_left2
+          (fun subst bds cargs ->
+            List.fold_left2
+              (fun subst (x, _) fa -> Subst.bind_local subst x fa)
+              subst bds cargs)
+          subst bds pargs in
+
+      let body = EcFol.form_of_expr EcFol.mhr body in
+      let body =
+        EcFol.Fsubst.subst_tvar
+          (EcTypes.Tvar.init (List.map fst op.EcDecl.op_tparams) tys) body in
+
+        Subst.subst subst body
+    with E.NoCtor -> reduce_user st (f_app f1 args ty)
+  end
+
   | _ ->
     let args, ty = flatten_args args in
     reduce_user st (f_app f1 args ty)
 
 (* -------------------------------------------------------------------- *)
 and reduce_user st f =
-  match reduce_user_gen (cbv_init st Subst.subst_id) st.st_ri st.st_env st.st_hyps f with
+  let cbv = cbv_init st Subst.subst_id in
+
+  match reduce_user_gen cbv st.st_ri st.st_env st.st_hyps f with
   | f -> cbv_init st Subst.subst_id f
   | exception NotReducible -> f
 
