@@ -1,3 +1,4 @@
+(* -------------------------------------------------------------------- *)
 open EcUtils
 open EcIdent
 open EcTypes
@@ -7,101 +8,133 @@ open EcReduction
 open EcBaseLogic
 module BI = EcBigInt
 
-(* -------------------------------------------------------------- *)
-
+(* -------------------------------------------------------------------- *)
 type state = {
-    st_ri    : reduction_info;
-    st_hyps  : LDecl.hyps;
-    st_env   : env;
-  }
+  st_ri   : reduction_info;
+  st_hyps : LDecl.hyps;
+  st_env  : EcEnv.env;
+}
 
-(* -------------------------------------------------------------- *)
-type subst = f_subst
+(* -------------------------------------------------------------------- *)
+module Subst : sig
+  type subst
 
-let subst_id = Fsubst.f_subst_id
+  val subst_id : subst
 
-let subst = Fsubst.f_subst
+  val subst          : subst -> form -> form
+  val subst_ty       : subst -> ty -> ty
+  val subst_xpath    : subst -> EcPath.xpath -> EcPath.xpath
+  val subst_m        : subst -> ident -> ident
+  val subst_me       : subst -> EcMemory.memenv -> EcMemory.memenv
+  val subst_lpattern : subst -> lpattern -> subst * lpattern
+  val subst_stmt     : subst -> EcModules.stmt -> EcModules.stmt
 
-let bind_local = Fsubst.f_bind_local
+  val bind_local   : subst -> ident -> form -> subst
+  val bind_locals  : subst -> (ident * form) list -> subst
+  val add_binding  : subst -> binding -> subst * binding
+  val add_bindings : subst -> bindings -> subst * bindings
 
-let bind_locals s ids es =
-  List.fold_left2 (fun s (x,_) e -> bind_local s x e) s ids es
+  val has_mem : subst -> ident -> bool
+end = struct
+  type subst = f_subst
 
-(* -------------------------------------------------------------- *)
+  let subst_id       = Fsubst.f_subst_id
+  let subst          = Fsubst.f_subst ?tx:None
+  let subst_ty       = Fsubst.subst_ty
+  let subst_xpath    = Fsubst.subst_xpath
+  let subst_m        = Fsubst.subst_m
+  let subst_me       = Fsubst.subst_me
+  let subst_lpattern = Fsubst.subst_lpattern
+  let subst_stmt     = Fsubst.subst_stmt
+  let bind_local     = Fsubst.f_bind_local
+  let add_binding    = Fsubst.add_binding
+  let add_bindings   = Fsubst.add_bindings
 
-let f_ands_simpl fs =
-  match List.rev fs with
-  | [] -> f_true
-  | [x] -> x
-  | f::fs -> f_ands_simpl (List.rev fs) f
+  let bind_locals (s : subst) xs =
+    List.fold_left (fun s (x, e) -> bind_local s x e) s xs
 
+  let has_mem (s : subst) (x : ident) =
+    Mid.mem x s.fs_mem
+end
+
+type subst = Subst.subst
+
+(* -------------------------------------------------------------------- *)
 let rec f_eq_simpl st f1 f2 =
-  if f_equal f1 f2 then f_true
-  else match f1.f_node, f2.f_node with
+  if f_equal f1 f2 then f_true else
+
+  match f1.f_node, f2.f_node with
   | Fapp({f_node = Fop (p1, _)}, args1),
     Fapp({f_node = Fop (p2, _)}, args2)
-      when EcEnv.Op.is_dtype_ctor st.st_env p1
-           && EcEnv.Op.is_dtype_ctor st.st_env p2 ->
+      when EcEnv.Op.is_dtype_ctor st.st_env p1 &&
+           EcEnv.Op.is_dtype_ctor st.st_env p2 ->
     let idx p =
       let idx = EcEnv.Op.by_path p st.st_env in
       snd (EcDecl.operator_as_ctor idx)
     in
+
     if   idx p1 <> idx p2
     then f_false
-    else f_ands_simpl (List.map2 (f_eq_simpl st) args1 args2)
+    else f_ands0_simpl (List.map2 (f_eq_simpl st) args1 args2)
 
   | Ftuple args1, Ftuple args2 ->
-    f_ands_simpl (List.map2 (f_eq_simpl st) args1 args2)
+    f_ands0_simpl (List.map2 (f_eq_simpl st) args1 args2)
 
   | _, _ ->
-    if (EqTest.for_type st.st_env f1.f_ty EcTypes.tunit
-        && EqTest.for_type st.st_env f2.f_ty EcTypes.tunit) ||
-         is_alpha_eq st.st_hyps f1 f2 then
-      f_true
+    if (EqTest.for_type st.st_env f1.f_ty EcTypes.tunit &&
+        EqTest.for_type st.st_env f2.f_ty EcTypes.tunit) ||
+       is_alpha_eq st.st_hyps f1 f2
+    then f_true
     else EcFol.f_eq_simpl f1 f2
 
-(* -------------------------------------------------------------- *)
+(* -------------------------------------------------------------------- *)
 let rec f_map_get_simpl st m x bty =
   match m.f_node with
-  | Fapp({f_node = Fop(p,_)}, [e])
-    when EcPath.p_equal p EcCoreLib.CI_Map.p_cst ->
+  | Fapp({ f_node = Fop(p, _)}, [e])
+      when EcPath.p_equal p EcCoreLib.CI_Map.p_cst ->
     e
 
   | Fapp({f_node = Fop(p, _)}, [m'; x'; e])
-    when EcPath.p_equal p EcCoreLib.CI_Map.p_set ->
-    let t = f_eq_simpl st x' x in
-    if f_equal t f_true then e
-    else if f_equal t f_false then f_map_get_simpl st m' x bty
-    else
+      when EcPath.p_equal p EcCoreLib.CI_Map.p_set
+    -> begin
+
+    match sform_of_form (f_eq_simpl st x' x) with
+    | SFtrue  -> e
+    | SFfalse -> f_map_get_simpl st m' x bty
+    | _       ->
       let m' = f_map_set_simplify st m' x in
       let m' = f_map_set m' x' e in
       f_map_get m' x bty
+  end
+
   | _ -> f_map_get m x bty
 
 and f_map_set_simplify st m x =
   match m.f_node with
-  | Fapp({f_node = Fop(p, _)}, [m'; x'; e])
-    when EcPath.p_equal p EcCoreLib.CI_Map.p_set ->
-    let t = f_eq_simpl st x' x in
-    if f_equal t f_true then f_map_cst x.f_ty e
-    else if f_equal t f_false then f_map_set_simplify st m' x
-    else
+  | Fapp({ f_node = Fop(p, _)}, [m'; x'; e])
+      when EcPath.p_equal p EcCoreLib.CI_Map.p_set
+    -> begin
+
+    match sform_of_form (f_eq_simpl st x' x) with
+    | SFtrue  -> f_map_cst x.f_ty e
+    | SFfalse -> f_map_set_simplify st m' x
+    | _       ->
       let m' = f_map_set_simplify st m' x in
       f_map_set m' x' e
+  end
+
   | _ -> m
 
-(* -------------------------------------------------------------- *)
-
+(* -------------------------------------------------------------------- *)
 type args =
   | Aempty of ty
-  | Aapp of form list * args
+  | Aapp   of form list * args
 
-let is_Aempty = function
-  | Aempty _ -> true
-  | _ -> false
+let is_Aempty = function Aempty _ -> true | _ -> false
+let is_Aapp   = function Aapp   _ -> true | _ -> false
 
 let mk_args args args' =
-  if args = [] then args' else Aapp(args, args')
+  if List.is_empty args then args' else Aapp(args, args')
 
 let rec get1_args = function
   | Aempty _ -> assert false
@@ -115,31 +148,27 @@ let rec flatten_args = function
     let args', ty = flatten_args args' in
     args @ args', ty
 
-(* -------------------------------------------------------------- *)
-
+(* -------------------------------------------------------------------- *)
 let norm_xfun st s f =
-  let f  = Fsubst.subst_xpath s f in
-  if st.st_ri.modpath then EcEnv.NormMp.norm_xfun st.st_env f
-  else f
+  let f  = Subst.subst_xpath s f in
+  if st.st_ri.modpath then EcEnv.NormMp.norm_xfun st.st_env f else f
 
-let norm_stmt s c = Fsubst.subst_stmt s c
+let norm_stmt s c  = Subst.subst_stmt s c
+let norm_me   s me = Subst.subst_me s me
 
-let norm_me s me = Fsubst.subst_me s me
-
-(* -------------------------------------------------------------- *)
-(* FIXME : I think substitution in type is wrong *)
-
+(* -------------------------------------------------------------------- *)
 let rec norm st s f =
- let f = cbv st s f (Aempty (Fsubst.subst_ty s f.f_ty)) in
+(* FIXME : I think substitution in type is wrong *)
+ let f = cbv st s f (Aempty (Subst.subst_ty s f.f_ty)) in
  norm_lambda st f
 
-and norm_lambda (st:state) (f:form) =
+and norm_lambda (st : state) (f : form) =
   match f.f_node with
   | Fquant(Llambda, b, f) ->
-    let s, b = Fsubst.add_bindings subst_id b in
-    let st = {st with st_env = Mod.add_mod_binding b st.st_env } in
-    let f = norm st s f in
-    f_lambda b f
+    let s, b = Subst.add_bindings Subst.subst_id b in
+    let st = { st with st_env = Mod.add_mod_binding b st.st_env } in
+    f_lambda b (norm st s f)
+
   | Fapp(f1,args) ->
     f_app (norm_lambda st f1) (List.map (norm_lambda st) args) f.f_ty
 
@@ -147,34 +176,43 @@ and norm_lambda (st:state) (f:form) =
 
   | Fproj (f1,i) -> f_proj (norm_lambda st f1) i f.f_ty
 
-  | Fquant _ | Fif _ | Fmatch _
-  | Flet _ | Fint _ | Flocal _
-  | Fglob _ | Fpvar _ | Fop _
+  | Fquant  _ | Fif     _ | Fmatch    _ | Flet _ | Fint _ | Flocal _
+  | Fglob   _ | Fpvar   _ | Fop       _
   | FhoareF _ | FhoareS _ | FbdHoareF _ | FbdHoareS _
-  | FequivF _ | FequivS _ | FeagerF _ | Fpr _ -> f
+  | FequivF _ | FequivS _ | FeagerF   _ | Fpr _
 
+    -> f
+
+(* -------------------------------------------------------------------- *)
 and betared st s bd f args =
   match bd, args with
   | _, Aapp([], args) -> betared st s bd f args
-  | [], _      -> cbv st s f args
-  | _ , Aempty _ -> subst s (f_quant Llambda bd f)
-  | (x,GTty _)::bd, Aapp(v::args, args') ->
-    let s = bind_local s x v in
+
+  | [], _ -> cbv st s f args
+
+  | _ , Aempty _ -> Subst.subst s (f_quant Llambda bd f)
+
+  | (x, GTty _) :: bd, Aapp (v :: args, args') ->
+    let s = Subst.bind_local s x v in
     betared st s bd f (Aapp(args,args'))
+
   | _::_, _ -> assert false
 
-
+(* -------------------------------------------------------------------- *)
 and app_red st f1 args =
   match f1.f_node, args with
-(*  | _, Aempty _ -> f1 *)
   (* β-reduction *)
   | Fquant(Llambda, bd, f2), _ when st.st_ri.beta ->
-    betared st subst_id bd f2 args
+    betared st Subst.subst_id bd f2 args
 
   (* ι-reduction (records projection) *)
-  | Fop (p, _), _ when st.st_ri.iota && EcEnv.Op.is_projection st.st_env p ->
+  | Fop (p, _), _ when
+      st.st_ri.iota && EcEnv.Op.is_projection st.st_env p
+    -> begin
+
     let mk, args1 = get1_args args in
-    begin match mk.f_node with
+
+    match mk.f_node with
     | Fapp ({ f_node = Fop (mkp, _) }, mkargs)
         when (EcEnv.Op.is_record_ctor st.st_env mkp) ->
       let v = oget (EcEnv.Op.by_path_opt p st.st_env) in
@@ -183,12 +221,12 @@ and app_red st f1 args =
     | _ ->
       let args, ty = flatten_args args in
       f_app f1 args ty
-    end
+  end
 
   (* logical reduction *)
   | Fop(p,tys), _ when is_some st.st_ri.logic && is_logical_op p ->
     let pcompat =
-      match oget st.st_ri.logic with `Full -> true | `ProductCompat -> false
+      match st.st_ri.logic with Some `Full -> true | _ -> false
     in
     let args, ty = flatten_args args in
     begin match op_kind p, args with
@@ -217,43 +255,50 @@ and app_red st f1 args =
     | _, _ ->
       reduce_user st (f_app f1 args ty)
     end
+
   (* FIXME: reduction of fixpoint *)
   | _ ->
     let args, ty = flatten_args args in
     reduce_user st (f_app f1 args ty)
 
-
+(* -------------------------------------------------------------------- *)
 and reduce_user st f =
-  match reduce_user_gen (cbv_init st subst_id) st.st_ri st.st_env st.st_hyps f with
-  | f -> cbv_init st subst_id f
+  match reduce_user_gen (cbv_init st Subst.subst_id) st.st_ri st.st_env st.st_hyps f with
+  | f -> cbv_init st Subst.subst_id f
   | exception NotReducible -> f
 
+(* -------------------------------------------------------------------- *)
 and cbv_init st s f =
-  cbv st s f (Aempty (Fsubst.subst_ty s f.f_ty))
+  cbv st s f (Aempty (Subst.subst_ty s f.f_ty))
 
-and cbv (st:state) (s:subst) (f:form) (args:args) : form =
+(* -------------------------------------------------------------------- *)
+and cbv (st : state) (s : subst) (f : form) (args : args) : form =
   match f.f_node with
-  | Fquant((Lforall | Lexists) as q, b, f) ->
+  | Fquant((Lforall | Lexists) as q, b, f) -> begin
     assert (is_Aempty args);
-    let s, b = Fsubst.add_bindings s b in
-    let st = {st with st_env = Mod.add_mod_binding b st.st_env } in
-    let f = norm st s f in
-    begin match q with
+
+    let f =
+      let s, b = Subst.add_bindings s b in
+      let st = { st with st_env = Mod.add_mod_binding b st.st_env } in
+      norm st s f in
+
+    match q with
     | Lforall -> f_forall_simpl b f
     | Lexists -> f_exists_simpl b f
     | _       -> assert false
-    end
+  end
 
-  | Fquant(Llambda, b, f1) ->
+  | Fquant (Llambda, b, f1) ->
     betared st s b f1 args
 
-  | Fif(f,f1,f2) ->
+  | Fif (f, f1, f2) ->
     if st.st_ri.iota then
       let f = cbv_init st s f in
-      if f_equal f f_true then cbv st s f1 args
-      else if f_equal f f_false then cbv st s f2 args
-      else
-        (* FIXME: should we normilize f, f1 and f2 ? *)
+      match sform_of_form f with
+      | SFtrue  -> cbv st s f1 args
+      | SFfalse -> cbv st s f2 args
+      | _ ->
+        (* FIXME: should we normalize f, f1 and f2 ? *)
         app_red st
           (f_if_simpl (norm_lambda st f) (norm st s f1) (norm st s f2)) args
     else
@@ -262,55 +307,60 @@ and cbv (st:state) (s:subst) (f:form) (args:args) : form =
 
   | Fmatch _ -> assert false
 
-  | Flet(p, f1, f2) ->
+  | Flet (p, f1, f2) ->
     let f1 = cbv_init st s f1 in
     begin match p, f1.f_node with
     (* ζ-reduction *)
     | LSymbol(x,_), _ when st.st_ri.zeta ->
-      let s = bind_local s x f1 in
+      let s = Subst.bind_local s x f1 in
       cbv st s f2 args
+
     (* ζ-reduction *)
     | LTuple ids, Ftuple es when st.st_ri.zeta ->
-      let s = bind_locals s ids es in
+      let s = Subst.bind_locals s (List.combine (List.fst ids) es) in
       cbv st s f2 args
+
     (* FIXME: LRecord *)
     | _, _ ->
       let f1 = norm_lambda st f1 in
-      let s, p = Fsubst.subst_lpattern s p in
+      let s, p = Subst.subst_lpattern s p in
       let f2 = norm st s f2 in
       app_red st (f_let p f1 f2) args
     end
 
   | Fint _ -> assert (is_Aempty args); f
 
-  | Flocal _ -> app_red st (Fsubst.f_subst s f) args
+  | Flocal _ -> app_red st (Subst.subst s f) args
 
   (* μ-reduction *)
   | Fglob _ ->
-    let mp, m = destr_glob (subst s f) in
+    let mp, m = destr_glob (Subst.subst s f) in
     let f =
-      if st.st_ri.modpath then EcEnv.NormMp.norm_glob st.st_env m mp
+      if   st.st_ri.modpath
+      then EcEnv.NormMp.norm_glob st.st_env m mp
       else f_glob mp m in
     app_red st f args
 
   (* μ-reduction *)
   | Fpvar _ ->
-    let pv, m = destr_pvar (subst s f) in
+    let pv, m = destr_pvar (Subst.subst s f) in
     let pv =
-      if st.st_ri.modpath then EcEnv.NormMp.norm_pvar st.st_env pv
+      if   st.st_ri.modpath
+      then EcEnv.NormMp.norm_pvar st.st_env pv
       else pv in
     app_red st (f_pvar pv f.f_ty m) args
 
   (* δ-reduction *)
-  | Fop _ -> (* FIXME maybe this should be done in app_red *)
-    let f = subst s f in
+  | Fop _ -> (* FIXME: maybe this should be done in app_red *)
+    let f = Subst.subst s f in
     let p, tys = destr_op f in
-    if  st.st_ri.delta_p p && Op.reducible st.st_env p then
+
+    if st.st_ri.delta_p p && Op.reducible st.st_env p then
       let f = Op.reduce st.st_env p tys in
-      cbv st subst_id f args
+      cbv st Subst.subst_id f args
     else app_red st f args
 
-  | Fapp(f1, args1) ->
+  | Fapp (f1, args1) ->
     let args1 = List.map (cbv_init st s) args1 in
     cbv st s f1 (Aapp(args1, args))
 
@@ -318,7 +368,7 @@ and cbv (st:state) (s:subst) (f:form) (args:args) : form =
     assert (is_Aempty args);
     f_tuple (List.map (cbv_init st s) args1)
 
-  | Fproj(f1,i) ->
+  | Fproj (f1, i) ->
     let f1 = cbv_init st s f1 in
     let f1 =
       match f1.f_node with
@@ -328,7 +378,8 @@ and cbv (st:state) (s:subst) (f:form) (args:args) : form =
 
   | FhoareF hf ->
     assert (is_Aempty args);
-    assert (not (Mid.mem mhr s.fs_mem) && not (Mid.mem mhr s.fs_mem));
+    assert (not (Subst.has_mem s mhr));
+    assert (not (Subst.has_mem s mhr));
     let hf_pr = norm st s hf.hf_pr in
     let hf_po = norm st s hf.hf_po in
     let hf_f  = norm_xfun st s hf.hf_f in
@@ -336,7 +387,7 @@ and cbv (st:state) (s:subst) (f:form) (args:args) : form =
 
   | FhoareS hs ->
     assert (is_Aempty args);
-    assert (not (Mid.mem (fst hs.hs_m) s.fs_mem));
+    assert (not (Subst.has_mem s (fst hs.hs_m)));
     let hs_pr = norm st s hs.hs_pr in
     let hs_po = norm st s hs.hs_po in
     let hs_s  = norm_stmt s hs.hs_s in
@@ -345,7 +396,7 @@ and cbv (st:state) (s:subst) (f:form) (args:args) : form =
 
   | FbdHoareF hf ->
     assert (is_Aempty args);
-    assert (not (Mid.mem mhr s.fs_mem) && not (Mid.mem mhr s.fs_mem));
+    assert (not (Subst.has_mem s mhr));
     let bhf_pr = norm st s hf.bhf_pr in
     let bhf_po = norm st s hf.bhf_po in
     let bhf_f  = norm_xfun st s hf.bhf_f in
@@ -354,7 +405,7 @@ and cbv (st:state) (s:subst) (f:form) (args:args) : form =
 
   | FbdHoareS bhs ->
     assert (is_Aempty args);
-    assert (not (Mid.mem (fst bhs.bhs_m) s.fs_mem));
+    assert (not (Subst.has_mem s (fst bhs.bhs_m)));
     let bhs_pr = norm st s bhs.bhs_pr in
     let bhs_po = norm st s bhs.bhs_po in
     let bhs_s  = norm_stmt s bhs.bhs_s in
@@ -364,7 +415,8 @@ and cbv (st:state) (s:subst) (f:form) (args:args) : form =
 
   | FequivF ef ->
     assert (is_Aempty args);
-    assert (not (Mid.mem mleft s.fs_mem) && not (Mid.mem mright s.fs_mem));
+    assert (not (Subst.has_mem s mleft));
+    assert (not (Subst.has_mem s mright));
     let ef_pr = norm st s ef.ef_pr in
     let ef_po = norm st s ef.ef_po in
     let ef_fl = norm_xfun st s ef.ef_fl in
@@ -373,8 +425,8 @@ and cbv (st:state) (s:subst) (f:form) (args:args) : form =
 
   | FequivS es ->
     assert (is_Aempty args);
-    assert (not (Mid.mem (fst es.es_ml) s.fs_mem) &&
-                not (Mid.mem (fst es.es_mr) s.fs_mem));
+    assert (not (Subst.has_mem s (fst es.es_ml)));
+    assert (not (Subst.has_mem s (fst es.es_mr)));
     let es_pr = norm st s es.es_pr in
     let es_po = norm st s es.es_po in
     let es_sl = norm_stmt s es.es_sl in
@@ -385,7 +437,8 @@ and cbv (st:state) (s:subst) (f:form) (args:args) : form =
 
   | FeagerF eg ->
     assert (is_Aempty args);
-    assert (not (Mid.mem mleft s.fs_mem) && not (Mid.mem mright s.fs_mem));
+    assert (not (Subst.has_mem s mleft));
+    assert (not (Subst.has_mem s mright));
     let eg_pr = norm st s eg.eg_pr in
     let eg_po = norm st s eg.eg_po in
     let eg_fl = norm_xfun st s eg.eg_fl in
@@ -396,28 +449,32 @@ and cbv (st:state) (s:subst) (f:form) (args:args) : form =
 
   | Fpr pr ->
     assert (is_Aempty args);
-    assert (not (Mid.mem mhr s.fs_mem));
-    let pr_mem   = Fsubst.subst_m s pr.pr_mem in
+    assert (not (Subst.has_mem s mhr));
+    let pr_mem   = Subst.subst_m s pr.pr_mem in
     let pr_fun   = norm_xfun st s pr.pr_fun in
     let pr_args  = norm st s pr.pr_args in
     let pr_event = norm st s pr.pr_event in
     f_pr_r { pr_mem; pr_fun; pr_args; pr_event; }
 
-
+(* -------------------------------------------------------------------- *)
 (* FIXME : initialize the subst with let in hyps *)
 let norm_cbv (ri : reduction_info) hyps f =
   let st = {
-      st_hyps = hyps;
-      st_env  = LDecl.toenv hyps;
-      st_ri   = ri
-    } in
-  (* compute the selected delta in hyps and push it into the subst *)
+    st_hyps = hyps;
+    st_env  = LDecl.toenv hyps;
+    st_ri   = ri
+  } in
+
   let add_hyp s (x,k) =
     match k with
     | LD_var (_, Some e) when ri.delta_h x ->
-      let v = cbv_init st s e in
-      bind_local s x v
+      let v = cbv_init st s e in Subst.bind_local s x v
     | _ -> s in
+
   let s =
-    List.fold_left add_hyp subst_id (List.rev (LDecl.tohyps hyps).h_local) in
-  norm st s f
+    List.fold_left
+      add_hyp
+      Subst.subst_id
+      (List.rev (LDecl.tohyps hyps).h_local)
+
+  in norm st s f
