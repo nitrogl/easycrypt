@@ -273,7 +273,7 @@ and pgty =
 | PGTY_Mem
 
 and pffilter =
-| PFRange      of bool * (int option pair) list
+| PFRange      of bool * [ `Single of int | `Range of int option pair] list
 | PFMatch      of psymbol * pformula
 | PFMatchBuild of psymbol list * pformula * pformula
 

@@ -2155,7 +2155,7 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
                 (if deep then flatten deep f1 else [f1]) @ (flatten deep f2)
               with DestrError _ -> [f] in
 
-            let filter1 (fs : form list) (i, j) =
+            let filter1 (fs : form list) ij =
               let n = List.length fs in
               let norm (x as ox) =
                 let x =
@@ -2169,11 +2169,12 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
                 | Some x -> x in
 
               match
-                match i, j with
-                | None  , None   -> `Range  (0, n)
-                | Some i, None   -> `Single (norm i)
-                | None  , Some j -> `Single (norm j)
-                | Some i, Some j -> `Range  (norm i, norm j + 1)
+                match ij with
+                | `Single  i     -> `Single (norm i)
+                | `Range  (i, j) ->
+                    let i = odfl 0 (omap norm i) in
+                    let j = odfl n (omap norm j) in
+                    `Range (i, j)
               with
               | `Single k        -> [List.nth fs k]
               | `Range  (k1, k2) -> List.take (k2 - k1) (List.drop k1 fs) in

@@ -1019,8 +1019,8 @@ qident_or_res_or_glob:
 pffilter:
 | LBRACKET flat=iboption(SLASH)
     rg=plist0(
-      i=sword? COLON j=sword? { (i, j) }
-    | i=sword                 { (Some i, None) }, COMMA)
+      i=sword? COLON j=sword? { `Range (i, j) }
+    | i=sword { `Single i }, COMMA)
   RBRACKET
 
   { PFRange (flat, rg) }
