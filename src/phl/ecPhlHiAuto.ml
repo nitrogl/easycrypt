@@ -72,7 +72,6 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
 
   | LL_CALL _ ->
          EcPhlCall.t_bdhoare_call f_true f_true None
-      @~ FApi.t_rotate `Left 1
 
   | LL_JUMP ->
         ( EcPhlApp.t_bdhoare_app
@@ -121,11 +120,33 @@ let t_lossless1_r tc =
   in FApi.t_onall ll_trivial (tactic tc)
 
 (* -------------------------------------------------------------------- *)
-let t_lossless_r =
-     FApi.t_try EcPhlFun.t_bdhoareF_fun_def
+let t_lossless_r tc =
+  begin
+    let module E = struct exception InvalidShape end in
+
+    let env = FApi.tc1_env tc in
+
+    try
+      match f_node (FApi.tc1_goal tc) with
+      | FbdHoareF bdf -> begin
+          let p    = EcEnv.NormMp.norm_xfun env bdf.bhf_f in
+          let proc = EcEnv.Fun.by_xpath p env in
+            match proc.f_def with FBdef _ -> () | _ -> raise E.InvalidShape
+        end
+
+      | FbdHoareS _ -> ()
+
+      | _ -> raise E.InvalidShape
+
+    with E.InvalidShape ->
+      tc_error !!tc "invalid initial goal for `islossless`"
+
+  end;
+
+  (  FApi.t_try EcPhlFun.t_bdhoareF_fun_def
   @! t_lossless1_r
   @! FApi.t_do `Maybe None
-      (FApi.t_seq EcPhlFun.t_bdhoareF_fun_def t_lossless1_r)
+      (FApi.t_seq EcPhlFun.t_bdhoareF_fun_def t_lossless1_r)) tc
 
 (* -------------------------------------------------------------------- *)
 let t_lossless = FApi.t_low0 "lossless" t_lossless_r
