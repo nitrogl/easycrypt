@@ -48,7 +48,7 @@ and ll_strategy_of_instr (env : EcEnv.env) (i : instr) =
   | _ -> LL_JUMP
 
 (* -------------------------------------------------------------------- *)
-let ll_trivial = EcPhlAuto.t_pl_trivial ~bases:["random"]
+let ll_trivial = EcPhlAuto.t_pl_trivial ~bases:["random"; "lossless"]
 
 (* -------------------------------------------------------------------- *)
 let rec apply_ll_strategy (lls : ll_strategy list) tc =
@@ -80,7 +80,7 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
         @~ FApi.t_onalli (function
            | 1 -> t_id
            | 2 -> t_id
-           | _ -> t_close t_auto))
+           | _ -> t_close ll_trivial))
 
         @~ FApi.t_rotate `Left 1
 
@@ -96,7 +96,7 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
         @~ FApi.t_onalli (function
            | 1 -> t_id
            | 2 -> condtc
-           | _ -> t_close t_auto))
+           | _ -> t_close ll_trivial))
 
         @~ FApi.t_rotate `Left 1
 
