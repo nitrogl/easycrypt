@@ -1223,8 +1223,72 @@ module Op = struct
         in List.fold_left addnew scope op.po_aliases
 
       end else scope
+    in
 
-    in tyop, scope
+    let tags = Sstr.of_list (List.map unloc op.po_tags) in
+
+    let add_distr_tag
+        (pred : path) (bases : string list) (tag : string) (suffix : string) scope
+    =
+      if not (EcAlgTactic.is_module_loaded scope.sc_env) then
+        hierror "for tag %s, load Distr first" tag;
+
+      let oppath   = EcPath.pqname (path scope) (unloc op.po_name) in
+      let nparams  = List.map (EcIdent.fresh |- fst) tyop.op_tparams in
+      let subst    = Tvar.init (List.fst tyop.op_tparams) (List.map tvar nparams) in
+      let ty       = Tvar.subst subst tyop.op_ty in
+      let aty, rty = EcTypes.tyfun_flat ty in
+
+      let dty =
+        match EcTypes.as_tdistr (EcEnv.ty_hnorm rty (env scope)) with
+        | None -> hierror ~loc "[lossless] can only be applied to distributions"
+        | Some dty -> dty
+      in
+
+      let bds = List.combine (List.map EcTypes.fresh_id_of_ty aty) aty in
+      let ax  = EcFol.f_op oppath (List.map tvar nparams) rty in
+      let ax  = EcFol.f_app ax (List.map (curry f_local) bds) rty in
+      let ax  = EcFol.f_app (EcFol.f_op pred [dty] (tfun rty tbool)) [ax] tbool in
+      let ax  = EcFol.f_forall (List.map (snd_map gtty) bds) ax in
+
+      let ax =
+        { ax_tparams = List.map (fun ty -> (ty, Sp.empty)) nparams;
+          ax_spec    = ax;
+          ax_kind    = `Axiom (Ssym.empty, false);
+          ax_nosmt   = false; } in
+
+      let scope, axname =
+        let axname = Printf.sprintf "%s_%s" (unloc op.po_name) suffix in
+        (Ax.bind scope false (axname, ax), axname) in
+
+      let axpath = EcPath.pqname (path scope) axname in
+
+      { scope with sc_env =
+          (* FIXME: use high-level API *)
+          List.fold_left (fun env base ->
+              EcEnv.Auto.add1 ~local:false ~level:0 ~base axpath env)
+            (env scope) bases }
+    in
+
+    let scope =
+      if   Sstr.mem "lossless" tags
+      then add_distr_tag EcCoreLib.CI_Distr.p_lossless
+             [EcCoreLib.base_ll] "lossless" "ll" scope
+      else scope in
+
+    let scope =
+      if   Sstr.mem "uniform" tags
+      then add_distr_tag EcCoreLib.CI_Distr.p_uniform
+             [EcCoreLib.base_rnd] "uniform" "uni" scope
+      else scope in
+
+    let scope =
+      if   Sstr.mem "full" tags
+      then add_distr_tag EcCoreLib.CI_Distr.p_full
+             [EcCoreLib.base_rnd] "full" "fu" scope
+      else scope in
+
+    tyop, scope
 end
 
 (* -------------------------------------------------------------------- *)
