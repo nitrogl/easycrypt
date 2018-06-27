@@ -2178,42 +2178,6 @@ module Section = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module Auto = struct
-  let addrw scope ~local ~base l =
-    let env = env scope in
-
-    if local then
-      hierror "rewrite hints cannot be local";
-
-    let env, base =
-      match EcEnv.BaseRw.lookup_opt base.pl_desc env with
-      | None ->
-        let pre, ibase = unloc base in
-        if not (List.is_empty pre) then
-          hierror ~loc:base.pl_loc
-            "cannot create rewrite hints out of its enclosing theory";
-        let env = EcEnv.BaseRw.add ibase env in
-        (env, fst (EcEnv.BaseRw.lookup base.pl_desc env))
-
-      | Some (base, _) -> (env, base) in
-
-    let l = List.map (fun l -> EcEnv.Ax.lookup_path (unloc l) env) l in
-    { scope with sc_env = EcEnv.BaseRw.addto base l env }
-
-  let addhint scope hint =
-    let base = omap unloc hint.ht_base in
-
-    let names = List.map
-      (fun l -> EcEnv.Ax.lookup_path (unloc l) scope.sc_env)
-      hint.ht_names in
-
-    { scope with sc_env =
-        EcEnv.Auto.add
-          ~local:hint.ht_local ~level:hint.ht_prio ?base
-          names scope.sc_env }
-end
-
-(* -------------------------------------------------------------------- *)
 module Reduction = struct
   let add_reduction scope reds =
     check_state `InTop "hint simplify" scope;
@@ -2235,8 +2199,6 @@ module Reduction = struct
 end
 
 (* -------------------------------------------------------------------- *)
-=======
->>>>>>> deploy-tagged-op
 module Cloning = struct
   (* ------------------------------------------------------------------ *)
   open EcTheory
