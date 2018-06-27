@@ -164,17 +164,17 @@ let rec norm st s f =
 
 and norm_lambda (st : state) (f : form) =
   match f.f_node with
-  | Fquant(Llambda, b, f) ->
+  | Fquant (Llambda, b, f) ->
     let s, b = Subst.add_bindings Subst.subst_id b in
     let st = { st with st_env = Mod.add_mod_binding b st.st_env } in
     f_lambda b (norm st s f)
 
-  | Fapp(f1,args) ->
+  | Fapp (f1, args) ->
     f_app (norm_lambda st f1) (List.map (norm_lambda st) args) f.f_ty
 
   | Ftuple args -> f_tuple (List.map (norm_lambda st) args)
 
-  | Fproj (f1,i) -> f_proj (norm_lambda st f1) i f.f_ty
+  | Fproj (f1, i) -> f_proj (norm_lambda st f1) i f.f_ty
 
   | Fquant  _ | Fif     _ | Fmatch    _ | Flet _ | Fint _ | Flocal _
   | Fglob   _ | Fpvar   _ | Fop       _
@@ -202,7 +202,7 @@ and betared st s bd f args =
 and app_red st f1 args =
   match f1.f_node, args with
   (* β-reduction *)
-  | Fquant(Llambda, bd, f2), _ when st.st_ri.beta ->
+  | Fquant (Llambda, bd, f2), _ when st.st_ri.beta ->
     betared st Subst.subst_id bd f2 args
 
   (* ι-reduction (records projection) *)
@@ -335,7 +335,7 @@ and cbv_init st s f =
 (* -------------------------------------------------------------------- *)
 and cbv (st : state) (s : subst) (f : form) (args : args) : form =
   match f.f_node with
-  | Fquant((Lforall | Lexists) as q, b, f) -> begin
+  | Fquant ((Lforall | Lexists) as q, b, f) -> begin
     assert (is_Aempty args);
 
     let f =
@@ -343,10 +343,12 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
       let st = { st with st_env = Mod.add_mod_binding b st.st_env } in
       norm st s f in
 
-    match q with
-    | Lforall -> f_forall_simpl b f
-    | Lexists -> f_exists_simpl b f
-    | _       -> assert false
+    match q, st.st_ri.logic with
+    | Lforall, Some `Full -> f_forall_simpl b f
+    | Lforall, _          -> f_forall b f
+    | Lexists, Some `Full -> f_exists_simpl b f
+    | Lexists, _          -> f_exists b f
+    | Llambda, _          -> assert false
   end
 
   | Fquant (Llambda, b, f1) ->
