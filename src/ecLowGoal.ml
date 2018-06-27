@@ -310,7 +310,7 @@ let t_cbn ?target ?(delta = true) ?(logic = Some `Full) (tc : tcenv1) =
 (* -------------------------------------------------------------------- *)
 type smode = [ `Cbv | `Cbn ]
 
-let dmode : smode = `Cbn
+let dmode : smode = `Cbv
 
 (* -------------------------------------------------------------------- *)
 let t_simplify_with_info ?(mode = dmode) =
