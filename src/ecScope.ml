@@ -774,6 +774,43 @@ module Tactics = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module Auto = struct
+  let add_rw scope ~local ~base l =
+    let env = env scope in
+
+    if local then
+      hierror "rewrite hints cannot be local";
+
+    let env, base =
+      match EcEnv.BaseRw.lookup_opt base.pl_desc env with
+      | None ->
+        let pre, ibase = unloc base in
+        if not (List.is_empty pre) then
+          hierror ~loc:base.pl_loc
+            "cannot create rewrite hints out of its enclosing theory";
+        let env = EcEnv.BaseRw.add ibase env in
+        (env, fst (EcEnv.BaseRw.lookup base.pl_desc env))
+
+      | Some (base, _) -> (env, base) in
+
+    let l = List.map (fun l -> EcEnv.Ax.lookup_path (unloc l) env) l in
+    { scope with sc_env = EcEnv.BaseRw.addto base l env }
+
+  let bind_hint scope ~local ~level ?base names =
+    { scope with sc_env =
+        EcEnv.Auto.add ~local ~level ?base names scope.sc_env }
+
+  let add_hint scope hint =
+    let base = omap unloc hint.ht_base in
+
+    let names = List.map
+      (fun l -> EcEnv.Ax.lookup_path (unloc l) scope.sc_env)
+      hint.ht_names in
+
+    bind_hint scope ~local:hint.ht_local ~level:hint.ht_prio ?base names
+end
+
+(* -------------------------------------------------------------------- *)
 module Ax = struct
   open EcParsetree
   open EcDecl
@@ -1263,11 +1300,11 @@ module Op = struct
 
       let axpath = EcPath.pqname (path scope) axname in
 
-      { scope with sc_env =
-          (* FIXME: use high-level API *)
-          List.fold_left (fun env base ->
-              EcEnv.Auto.add1 ~local:false ~level:0 ~base axpath env)
-            (env scope) bases }
+      List.fold_left
+        (fun scope base ->
+            Auto.bind_hint ~local:false ~level:0 ~base scope [axpath])
+        scope bases
+
     in
 
     let scope =
@@ -2135,42 +2172,6 @@ module Section = struct
         in
 
         List.fold_left bind1 scope oitems
-end
-
-(* -------------------------------------------------------------------- *)
-module Auto = struct
-  let addrw scope ~local ~base l =
-    let env = env scope in
-
-    if local then
-      hierror "rewrite hints cannot be local";
-
-    let env, base =
-      match EcEnv.BaseRw.lookup_opt base.pl_desc env with
-      | None ->
-        let pre, ibase = unloc base in
-        if not (List.is_empty pre) then
-          hierror ~loc:base.pl_loc
-            "cannot create rewrite hints out of its enclosing theory";
-        let env = EcEnv.BaseRw.add ibase env in
-        (env, fst (EcEnv.BaseRw.lookup base.pl_desc env))
-
-      | Some (base, _) -> (env, base) in
-
-    let l = List.map (fun l -> EcEnv.Ax.lookup_path (unloc l) env) l in
-    { scope with sc_env = EcEnv.BaseRw.addto base l env }
-
-  let addhint scope hint =
-    let base = omap unloc hint.ht_base in
-
-    let names = List.map
-      (fun l -> EcEnv.Ax.lookup_path (unloc l) scope.sc_env)
-      hint.ht_names in
-
-    { scope with sc_env =
-        EcEnv.Auto.add
-          ~local:hint.ht_local ~level:hint.ht_prio ?base
-          names scope.sc_env }
 end
 
 (* -------------------------------------------------------------------- *)
