@@ -637,11 +637,14 @@ and reduce_context ri env hyps f =
 
     (* Contextual rule - bindings *)
   | Fquant (Lforall as t, b, f1)
-  | Fquant (Lexists as t, b, f1) when ri.logic = Some `Full -> begin
-      let ctor = match t with
-        | Lforall -> f_forall_simpl
-        | Lexists -> f_exists_simpl
-        | _       -> assert false in
+  | Fquant (Lexists as t, b, f1) -> begin
+      let ctor =
+        match t, ri.logic with
+        | Lforall, Some `Full -> f_forall_simpl
+        | Lforall, _          -> f_forall
+        | Lexists, Some `Full -> f_exists_simpl
+        | Lexists, _          -> f_exists
+        | Llambda, _          -> assert false in
 
       try
         let env = Mod.add_mod_binding b env in
