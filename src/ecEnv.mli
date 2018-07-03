@@ -372,7 +372,7 @@ module Reduction : sig
 
   val add1 : ?idx:int -> rule -> env -> env
   val add  : (int * rule) list -> env -> env
-  val get  : path -> env -> rule list
+  val get  : path option -> env -> rule list
 end
 
 (* -------------------------------------------------------------------- *)

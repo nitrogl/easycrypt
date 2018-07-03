@@ -128,6 +128,7 @@ type env_norm = {
 }
 
 (* -------------------------------------------------------------------- *)
+
 type preenv = {
   env_top      : EcPath.path option;
   env_gstate   : EcGState.gstate;
@@ -142,7 +143,7 @@ type preenv = {
   env_tc       : TC.graph;
   env_rwbase   : Sp.t Mip.t;
   env_atbase   : (path list Mint.t) Msym.t;
-  env_redbase  : redinfo Mp.t;
+  env_redbase  : mredinfo;
   env_ntbase   : (path * env_notation) list;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_item     : ctheory_item list;     (* in reverse order *)
@@ -165,6 +166,10 @@ and tcinstance = [
 and redinfo =
   { ri_priomap : (EcTheory.rule list) Mint.t;
     ri_list    : (EcTheory.rule list) Lazy.t; }
+
+and mredinfo =
+  { mri_op    : redinfo Mp.t;
+    mri_tuple : redinfo option; }
 
 and env_notation = ty_params * EcDecl.notation
 
@@ -250,7 +255,7 @@ let empty gstate =
     env_tc       = TC.Graph.empty;
     env_rwbase   = Mip.empty;
     env_atbase   = Msym.empty;
-    env_redbase  = Mp.empty;
+    env_redbase  = { mri_op = Mp.empty; mri_tuple = None };
     env_ntbase   = [];
     env_modlcs   = Sid.empty;
     env_item     = [];
@@ -1354,13 +1359,21 @@ end
 module Reduction = struct
   type rule = EcTheory.rule
 
-  let add_rule (idx : int) (rule : rule) (db : redinfo Mp.t) =
+  let add_redinfo f p db =
+    match p with
+    | Some p ->
+      { db with mri_op = Mp.change f p db.mri_op }
+    | None ->
+      { db with mri_tuple = f db.mri_tuple }
+
+
+  let add_rule (idx : int) (rule : rule) (db : mredinfo) =
     let p =
       match rule.rl_ptn with
-      | Rule ((p, _), _) -> p
+      | Rule (p, _) -> omap fst p
       | Var _ | Int _ -> assert false in
 
-    Mp.change (fun rls ->
+    add_redinfo (fun rls ->
       let { ri_priomap } =
         match rls with
         | None   -> { ri_priomap = Mint.empty; ri_list = Lazy.from_val [] }
@@ -1375,7 +1388,7 @@ module Reduction = struct
 
       Some { ri_priomap; ri_list }) p db
 
-  let add_rules (rules : (int * rule) list) (db : redinfo Mp.t) =
+  let add_rules (rules : (int * rule) list) (db : mredinfo) =
     List.fold_left ((^~) (curry add_rule)) db rules
 
   let add (rules : (int * rule) list) (env : env) =
@@ -1386,10 +1399,12 @@ module Reduction = struct
   let add1 ?(idx = 0) (rule : rule) (env : env) =
     add [(idx, rule)] env
 
-  let get (p : EcPath.path) (env : env) =
-    Mp.find_opt p env.env_redbase
-      |> omap (fun x -> Lazy.force x.ri_list)
-      |> odfl []
+  let get (p : EcPath.path option) (env : env) =
+    (match p with
+     | None -> env.env_redbase.mri_tuple
+     | Some p -> Mp.find_opt p env.env_redbase.mri_op)
+    |> omap (fun x -> Lazy.force x.ri_list)
+    |> odfl []
 end
 
 (* -------------------------------------------------------------------- *)

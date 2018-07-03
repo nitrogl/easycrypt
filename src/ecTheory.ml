@@ -38,9 +38,9 @@ and tcinstance = [ `Ring of ring | `Field of field | `General of path ]
 and thmode     = [ `Abstract | `Concrete ]
 
 and rule_pattern =
-  | Rule of (EcPath.path * EcTypes.ty list) * rule_pattern list
-  | Int  of EcBigInt.zint
-  | Var  of EcIdent.t
+  | Rule  of (EcPath.path * EcTypes.ty list) option * rule_pattern list
+  | Int   of EcBigInt.zint
+  | Var   of EcIdent.t
 
 and rule = {
   rl_tyd  : EcDecl.ty_params;
