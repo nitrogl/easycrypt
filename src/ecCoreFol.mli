@@ -270,8 +270,7 @@ val f_int_sub  : form -> form -> form
 val f_int_opp  : form -> form
 val f_int_mul  : form -> form -> form
 val f_int_pow  : form -> form -> form
-val f_int_div  : form -> form -> form
-val f_int_mod  : form -> form -> form
+val f_int_edivz : form -> form -> form
 
 (* -------------------------------------------------------------------- *)
 module FSmart : sig

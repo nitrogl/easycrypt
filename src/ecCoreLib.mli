@@ -79,8 +79,7 @@ module CI_Int : sig
   val p_int_le  : path
   val p_int_lt  : path
 
-  val p_int_div : path
-  val p_int_mod : path
+  val p_int_edivz : path
 end
 
 (* -------------------------------------------------------------------- *)
