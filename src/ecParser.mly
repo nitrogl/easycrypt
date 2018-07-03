@@ -3396,13 +3396,10 @@ reduction:
     { xs }
 
 user_red_info:
-| x=qident
-    { ([x], None) }
+| x=qident i=prefix(AT, word)?
+    { ([x], i) }
 
-| x=qident AT i=word
-    { ([x], Some i) }
-
-| xs=paren(plist1(qident, COMMA)) AT i=word
+| xs=paren(plist1(qident, COMMA)) i=prefix(AT, word)
     { (xs, Some i) }
 
 (* -------------------------------------------------------------------- *)
