@@ -314,7 +314,7 @@ and app_red st f1 args =
         EcFol.Fsubst.subst_tvar
           (EcTypes.Tvar.init (List.map fst op.EcDecl.op_tparams) tys) body in
 
-      Subst.subst subst body
+      cbv st subst body (Aempty ty)
     with E.NoCtor -> reduce_user st (f_app f1 args ty)
   end
 
