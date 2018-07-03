@@ -66,8 +66,7 @@ module CI_Int = struct
   let p_int_le  = _Int "<="
   let p_int_lt  = _Int "<"
 
-  let p_int_div = _IntDiv "%/"
-  let p_int_mod = _IntDiv "%%"
+  let p_int_edivz = _IntDiv "edivz"
 end
 
 (* -------------------------------------------------------------------- *)

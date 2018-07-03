@@ -246,8 +246,7 @@ and app_red st f1 args =
     | Some (`Int_add  ), [f1;f2] -> f_int_add_simpl f1 f2
     | Some (`Int_opp  ), [f]     -> f_int_opp_simpl f
     | Some (`Int_mul  ), [f1;f2] -> f_int_mul_simpl f1 f2
-    | Some (`Int_div  ), [f1;f2] -> f_int_div_simpl f1 f2
-    | Some (`Int_mod  ), [f1;f2] -> f_int_mod_simpl f1 f2
+    | Some (`Int_edivz), [f1;f2] -> f_int_edivz_simpl f1 f2
     | Some (`Real_add ), [f1;f2] -> f_real_add_simpl f1 f2
     | Some (`Real_opp ), [f]     -> f_real_opp_simpl f
     | Some (`Real_mul ), [f1;f2] -> f_real_mul_simpl f1 f2
