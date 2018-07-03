@@ -262,6 +262,7 @@ val fop_int_pow : form
 
 val f_i0 : form
 val f_i1 : form
+val f_im1 : form
 
 val f_int      : zint -> form
 val f_int_add  : form -> form -> form
@@ -269,6 +270,8 @@ val f_int_sub  : form -> form -> form
 val f_int_opp  : form -> form
 val f_int_mul  : form -> form -> form
 val f_int_pow  : form -> form -> form
+val f_int_div  : form -> form -> form
+val f_int_mod  : form -> form -> form
 
 (* -------------------------------------------------------------------- *)
 module FSmart : sig

@@ -114,6 +114,8 @@ val f_int_add_simpl : form -> form -> form
 val f_int_opp_simpl : form -> form
 val f_int_sub_simpl : form -> form -> form
 val f_int_mul_simpl : form -> form -> form
+val f_int_div_simpl : form -> form -> form
+val f_int_mod_simpl : form -> form -> form
 
 val f_real_add_simpl : form -> form -> form
 val f_real_opp_simpl : form -> form
@@ -148,6 +150,8 @@ type op_kind = [
   | `Int_mul
   | `Int_pow
   | `Int_opp
+  | `Int_div
+  | `Int_mod
   | `Real_add
   | `Real_opp
   | `Real_mul
