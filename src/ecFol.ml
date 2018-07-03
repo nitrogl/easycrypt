@@ -172,6 +172,26 @@ let f_int_mul_simpl f1 f2 =
     else if f_equal f_i1 f2 then f1
     else f_int_mul f1 f2
 
+let f_int_div_simpl f1 f2 =
+  if f_equal f2 f_i0 then f_i0
+  else
+    try
+      f_int (fst (BI.ediv (destr_int f1) (destr_int f2)))
+    with DestrError _ ->
+      if f_equal f1 f_i0 then f_i0
+      else if f_equal f2 f_i1 then f1
+      else if f_equal f2 f_im1 then f_int_opp_simpl f2
+      else f_int_div f1 f2
+
+let f_int_mod_simpl f1 f2 =
+  if f_equal f2 f_i0 then f1
+  else
+  try f_int (BI.erem (destr_int f1) (destr_int f2))
+  with DestrError _ ->
+    if f_equal f1 f_i0 || f_equal f2 f_i1 || f_equal f2 f_im1 then f_i0
+    else f_int_mod f1 f2
+
+
 (* -------------------------------------------------------------------- *)
 let destr_rdivint =
   let rec aux isneg f =
@@ -526,6 +546,8 @@ type op_kind = [
   | `Int_mul
   | `Int_pow
   | `Int_opp
+  | `Int_div
+  | `Int_mod
   | `Real_add
   | `Real_opp
   | `Real_mul
@@ -550,6 +572,9 @@ let operators =
      CI.CI_Int .p_int_opp , `Int_opp  ;
      CI.CI_Int .p_int_mul , `Int_mul  ;
      CI.CI_Int .p_int_pow , `Int_pow  ;
+     CI.CI_Int .p_int_div , `Int_div  ;
+     CI.CI_Int .p_int_mod , `Int_mod  ;
+
      CI.CI_Real.p_real_add, `Real_add ;
      CI.CI_Real.p_real_opp, `Real_opp ;
      CI.CI_Real.p_real_mul, `Real_mul ;
@@ -572,7 +597,7 @@ let is_logical_op op =
   | Some (
         `Not | `And _ | `Or _ | `Imp | `Iff | `Eq
       | `Int_le   | `Int_lt   | `Real_le  | `Real_lt
-      | `Int_add  | `Int_opp  | `Int_mul
+      | `Int_add  | `Int_opp  | `Int_mul | `Int_div | `Int_mod
       | `Real_add | `Real_opp | `Real_mul | `Real_inv
    ) -> true
 
