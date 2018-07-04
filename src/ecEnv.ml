@@ -2893,6 +2893,15 @@ module Theory = struct
     in bind_base_cth for1
 
   (* ------------------------------------------------------------------ *)
+  let bind_rd_cth =
+    let for1 _path db = function
+      | CTh_reduction x ->
+         Some (Reduction.add_rules x db)
+      | _ -> None
+
+    in bind_base_cth for1
+
+  (* ------------------------------------------------------------------ *)
   let bind ?(mode = `Concrete) name cth env =
     let th = (cth, mode) in
 
@@ -3068,11 +3077,12 @@ module Theory = struct
     let env = { env with env_current = current; env_comps = comps; } in
 
     { env with
-        env_tci    = bind_instance_cth thpath env.env_tci cth;
-        env_tc     = bind_tc_cth thpath env.env_tc cth;
-        env_rwbase = bind_br_cth thpath env.env_rwbase cth;
-        env_atbase = bind_at_cth thpath env.env_atbase cth;
-        env_ntbase = bind_nt_cth thpath env.env_ntbase cth; }
+        env_tci     = bind_instance_cth thpath env.env_tci cth;
+        env_tc      = bind_tc_cth thpath env.env_tc cth;
+        env_rwbase  = bind_br_cth thpath env.env_rwbase cth;
+        env_atbase  = bind_at_cth thpath env.env_atbase cth;
+        env_ntbase  = bind_nt_cth thpath env.env_ntbase cth;
+        env_redbase = bind_rd_cth thpath env.env_redbase cth; }
 end
 
 (* -------------------------------------------------------------------- *)
