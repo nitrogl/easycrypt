@@ -3399,8 +3399,8 @@ user_red_info:
 | x=qident i=prefix(AT, word)?
     { ([x], i) }
 
-| xs=paren(plist1(qident, COMMA)) i=prefix(AT, word)
-    { (xs, Some i) }
+| xs=paren(plist1(qident, COMMA)) i=prefix(AT, word)?
+    { (xs, i) }
 
 (* -------------------------------------------------------------------- *)
 (* Search pattern                                                       *)
