@@ -2910,13 +2910,14 @@ module Theory = struct
 
     match mode with
     | `Concrete ->
-        let thname     = EcPath.pqname (root env) name in
-        let env_tci    = bind_instance_cth thname env.env_tci cth in
-        let env_tc     = bind_tc_cth thname env.env_tc cth in
-        let env_rwbase = bind_br_cth thname env.env_rwbase cth in
-        let env_atbase = bind_at_cth thname env.env_atbase cth in
-        let env_ntbase = bind_nt_cth thname env.env_ntbase cth in
-        { env with env_tci; env_tc; env_rwbase; env_atbase; env_ntbase; }
+        let thname      = EcPath.pqname (root env) name in
+        let env_tci     = bind_instance_cth thname env.env_tci cth in
+        let env_tc      = bind_tc_cth thname env.env_tc cth in
+        let env_rwbase  = bind_br_cth thname env.env_rwbase cth in
+        let env_atbase  = bind_at_cth thname env.env_atbase cth in
+        let env_ntbase  = bind_nt_cth thname env.env_ntbase cth in
+        let env_redbase = bind_rd_cth thname env.env_redbase cth in
+        { env with env_tci; env_tc; env_rwbase; env_atbase; env_ntbase; env_redbase; }
 
     | `Abstract ->
         env
