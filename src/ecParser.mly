@@ -399,6 +399,7 @@
 %token CLEAR
 %token CLONE
 %token COLON
+%token COLONTILD
 %token COMMA
 %token CONGR
 %token CONSEQ
@@ -855,6 +856,9 @@ sexpr_u:
        PEscope (pqsymb_of_symb p.pl_loc "<top>", e)
      end }
 
+| LPAREN e=expr COLONTILD ty=loc(type_exp) RPAREN
+   { PEcast (e, ty) }
+
 | n=uint
    { PEint n }
 
@@ -1051,6 +1055,9 @@ sform_u(P):
          parse_error p.pl_loc (Some "invalid scope name");
        PFscope (pqsymb_of_symb p.pl_loc "<top>", f)
      end }
+
+| LPAREN f=form_r(P) COLONTILD ty=loc(type_exp) RPAREN
+   { PFcast (f, ty) }
 
 | SHARP pf=pffilter* x=ident
    { PFref (x, pf) }

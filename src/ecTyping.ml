@@ -1103,6 +1103,11 @@ let transexp (env : EcEnv.env) mode ue e =
     let transexp = transexp_r osc in
 
     match e.pl_desc with
+    | PEcast (pe, pty) ->
+        let ty = transty tp_relax env ue pty in
+        let (_, ety) as aout = transexp env pe in
+        unify_or_fail env ue pe.pl_loc ~expct:ty ety; aout
+
     | PEint i -> (e_int i, tint)
 
     | PEident ({ pl_desc = name }, tvi) ->
@@ -2226,6 +2231,11 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
 
             in List.fold_left filter f filters
     end
+
+    | PFcast (pf, pty) ->
+        let ty = transty tp_relax env ue pty in
+        let aout = transf env pf in
+        unify_or_fail env ue pf.pl_loc ~expct:ty aout.f_ty; aout
 
     | PFmem _ -> tyerror f.pl_loc env MemNotAllowed
 
