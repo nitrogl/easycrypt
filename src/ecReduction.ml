@@ -276,9 +276,9 @@ module User = struct
       let rec rule (f : form) : EcTheory.rule_pattern =
         match EcFol.destr_app f with
         | { f_node = Fop (p, tys) }, args ->
-            R.Rule (Some (p, tys), List.map rule args)
+            R.Rule (`Op (p, tys), List.map rule args)
         | { f_node = Ftuple args }, [] ->
-            R.Rule (None, List.map rule args)
+            R.Rule (`Tuple, List.map rule args)
         | { f_node = Fint i }, [] ->
             R.Int i
         | { f_node = Flocal x }, [] ->
@@ -297,13 +297,13 @@ module User = struct
         | R.Rule (op, args) ->
             let ltyvars =
               match op with
-              | Some (_, tys) ->
+              | `Op (_, tys) ->
                 List.fold_left (
                     let rec doit ltyvars = function
                       | { ty_node = Tvar a } -> Sid.add a ltyvars
                       | _ as ty -> ty_fold doit ltyvars ty in doit)
                   ltyvars tys
-              | None -> ltyvars in
+              | `Tuple -> ltyvars in
             List.fold_left doit (lvars, ltyvars) args
 
       in doit (Sid.empty, Sid.empty) rule in
@@ -667,9 +667,9 @@ and reduce_user_gen simplify ri env hyps f =
   if not ri.user then raise NotReducible;
 
   let p =
-    match destr_app f with
-    | { f_node = Fop (p, _ty) }, _ -> Some p
-    | { f_node = Ftuple _ }, _ -> None
+    match f_node (fst (destr_app f)) with
+    | Fop (p, _) -> `Path p
+    | Ftuple _   -> `Tuple
     | _ -> raise NotReducible in
 
   let rules = EcEnv.Reduction.get p env in
@@ -684,7 +684,7 @@ and reduce_user_gen simplify ri env hyps f =
     try
       let rec doit f ptn =
         match destr_app f, ptn with
-        | ({ f_node = Fop (p, tys) }, args), R.Rule (Some(p', tys'), args')
+        | ({ f_node = Fop (p, tys) }, args), R.Rule (`Op (p', tys'), args')
               when EcPath.p_equal p p' && List.length args = List.length args' ->
 
           let tys' = List.map (EcTypes.Tvar.subst tvi) tys' in
@@ -695,7 +695,7 @@ and reduce_user_gen simplify ri env hyps f =
 
           List.iter2 doit args args'
 
-        | ({ f_node = Ftuple args} , []), R.Rule (None, args')
+        | ({ f_node = Ftuple args} , []), R.Rule (`Tuple, args')
             when List.length args = List.length args' ->
 
           List.iter2 doit args args'
