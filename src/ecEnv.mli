@@ -368,11 +368,12 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Reduction : sig
-  type rule = EcTheory.rule
+  type rule   = EcTheory.rule
+  type topsym = [ `Path of path | `Tuple ]
 
   val add1 : ?idx:int -> rule -> env -> env
   val add  : (int * rule) list -> env -> env
-  val get  : path option -> env -> rule list
+  val get  : topsym -> env -> rule list
 end
 
 (* -------------------------------------------------------------------- *)
