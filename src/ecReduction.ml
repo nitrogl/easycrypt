@@ -266,7 +266,9 @@ module User = struct
         match sform_of_form f with
         | SFimp (f1, f2) -> doit (f1 :: conds) f2
         | SFeq  (f1, f2) -> (f1, f2, List.rev conds)
-        | _              -> raise (InvalidUserRule NotAnEq)
+        | _ when ty_equal tbool (EcEnv.ty_hnorm f.f_ty env) ->
+            (f, f_true, List.rev conds)
+        | _ -> raise (InvalidUserRule NotAnEq)
       in doit [] rl
     in
 
