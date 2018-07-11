@@ -1371,7 +1371,9 @@ module Reduction = struct
   type rule   = EcTheory.rule
   type topsym = red_topsym
 
-  let add_rule (idx : int) (rule : rule) (db : mredinfo) =
+  let add_rule (idx : int) ((_, rule) : path * rule option) (db : mredinfo) =
+    match rule with None -> db | Some rule ->
+
     let p =
       match rule.rl_ptn with
       | Rule (`Op p , _) -> `Path (fst p)
@@ -1393,16 +1395,16 @@ module Reduction = struct
 
       Some { ri_priomap; ri_list }) p db
 
-  let add_rules (rules : (int * rule) list) (db : mredinfo) =
+  let add_rules (rules : (int * (path * rule option)) list) (db : mredinfo) =
     List.fold_left ((^~) (curry add_rule)) db rules
 
-  let add (rules : (int * rule) list) (env : env) =
+  let add (rules : (int * (path * rule option)) list) (env : env) =
     { env with
         env_redbase = add_rules rules env.env_redbase;
         env_item    = CTh_reduction rules :: env.env_item; }
 
-  let add1 ?(idx = 0) (rule : rule) (env : env) =
-    add [(idx, rule)] env
+  let add1 ?(idx = 0) (prule : path * rule option) (env : env) =
+    add [(idx, prule)] env
 
   let get (p : topsym) (env : env) =
     Mrd.find_opt p env.env_redbase
