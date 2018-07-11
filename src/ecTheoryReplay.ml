@@ -51,6 +51,7 @@ and 'a ovrhooks = {
   hauto    : 'a -> bool * int * string option * EcPath.path list -> 'a;
   htycl    : 'a -> symbol * typeclass -> 'a;
   hinst    : 'a -> (ty_params * ty) * tcinstance -> 'a;
+  husered  : 'a -> (int * (EcPath.path * EcTheory.rule option)) list -> 'a;
   hthenter : 'a -> thmode -> symbol -> 'a;
   hthexit  : 'a -> [`Full | `ClearOnly | `No] -> 'a;
   herr     : 'b . ?loc:EcLocation.t -> string -> 'b;
@@ -425,8 +426,22 @@ and replay_auto
 
 (* -------------------------------------------------------------------- *)
 and replay_reduction
-  (_ove : _ ovrenv) (subst, ops, proofs, scope) (_ : (int * EcTheory.rule) list)
+  (ove : _ ovrenv) (subst, ops, proofs, scope)
+  (rules : (int * (EcPath.path * EcTheory.rule option)) list)
 =
+  let for1 (i, (p, rule)) =
+    let p = EcSubst.subst_path subst p in
+
+    let rule =
+      obind (fun _rule ->
+        try  Some (EcReduction.User.compile (ove.ovre_hooks.henv scope) p)
+        with EcReduction.User.InvalidUserRule _ -> None) rule
+
+    in (i, (p, rule)) in
+
+  let rules = List.map for1 rules in
+  let scope = ove.ovre_hooks.husered scope rules in
+
   (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)

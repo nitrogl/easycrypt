@@ -2123,7 +2123,7 @@ module Reduction = struct
       let for1 idx name =
         let lemma    = fst (EcEnv.Ax.lookup (unloc name) (env scope)) in
         let red_info = EcReduction.User.compile (env scope) lemma in
-        (odfl 0 idx, red_info) in
+        (odfl 0 idx, (lemma, Some red_info)) in
 
       let rules = List.map (fun (xs, idx) -> List.map (for1 idx) xs) reds in
       List.flatten rules
@@ -2162,6 +2162,7 @@ module Cloning = struct
       R.haddrw   = onenv (curry EcEnv.BaseRw.addto);
       R.hauto    = onenv (fun (local, level, base, names) ->
                             EcEnv.Auto.add ~local ~level ?base names);
+      R.husered  = onenv EcEnv.Reduction.add;
       R.htycl    = onenv (curry EcEnv.TypeClass.bind);
       R.hinst    = onenv (curry EcEnv.TypeClass.add_instance);
       R.hthenter = thenter;
