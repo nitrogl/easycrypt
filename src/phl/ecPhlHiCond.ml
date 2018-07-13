@@ -17,7 +17,8 @@ open EcPhlCond
 
 (* -------------------------------------------------------------------- *)
 let process_cond info tc =
-  let default_if i s = ofdfl (fun _ -> tc1_pos_last_if tc s) i in
+  let default_if (i : EcParsetree.codepos1 option) s =
+    ofdfl (fun _ -> Zpr.cpos (tc1_pos_last_if tc s)) i in
 
   match info with
   | `Head side ->

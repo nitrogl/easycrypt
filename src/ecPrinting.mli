@@ -29,6 +29,7 @@ type prpo_display = { prpo_pr : bool; prpo_po : bool; }
 
 (* -------------------------------------------------------------------- *)
 val string_of_hcmp : EcFol.hoarecmp -> string
+val string_of_cpos1 : EcParsetree.codepos1 -> string
 
 (* -------------------------------------------------------------------- *)
 type 'a pp = Format.formatter -> 'a -> unit

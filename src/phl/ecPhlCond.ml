@@ -29,7 +29,7 @@ module LowInternal = struct
 
    let t_sub b tc =
      FApi.t_on1seq 0
-       (EcPhlRCond.t_rcond side b 1)
+       (EcPhlRCond.t_rcond side b (Zpr.cpos 1))
        (FApi.t_seqs
            [t_introm; EcPhlSkip.t_skip; t_intros_i [m2;h];
             FApi.t_or
@@ -104,9 +104,9 @@ let rec t_equiv_cond side tc =
              (FApi.t_seqsub
                 (t_equiv_cond (Some `Left))
                 [FApi.t_seqsub
-                   (EcPhlRCond.Low.t_equiv_rcond `Right true  1)
+                   (EcPhlRCond.Low.t_equiv_rcond `Right true (Zpr.cpos 1))
                    [t_aux; t_clear hiff];
                  FApi.t_seqsub
-                   (EcPhlRCond.Low.t_equiv_rcond `Right false 1)
+                   (EcPhlRCond.Low.t_equiv_rcond `Right false (Zpr.cpos 1))
                    [t_aux; t_clear hiff]]))
           tc
