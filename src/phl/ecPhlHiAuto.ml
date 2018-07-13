@@ -63,7 +63,7 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
   tc |> match lls with
 
   | LL_WP ->
-      EcPhlWp.t_wp (Some (Single (-1)))
+      EcPhlWp.t_wp (Some (Single (Zpr.cpos (-1))))
 
   | LL_RND ->
          EcPhlRnd.t_bdhoare_rnd PNoRndParams
@@ -75,7 +75,7 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
 
   | LL_JUMP ->
         ( EcPhlApp.t_bdhoare_app
-           (-1) (f_true, f_true, f_r1, f_r1, f_r0, f_r1)
+           (Zpr.cpos (-1)) (f_true, f_true, f_r1, f_r1, f_r0, f_r1)
 
         @~ FApi.t_onalli (function
            | 1 -> t_id
@@ -91,7 +91,7 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
       in
 
         ( EcPhlApp.t_bdhoare_app
-           (-1) (f_true, f_true, f_r1, f_r1, f_r0, f_r1)
+           (Zpr.cpos (-1)) (f_true, f_true, f_r1, f_r1, f_r0, f_r1)
 
         @~ FApi.t_onalli (function
            | 1 -> t_id
