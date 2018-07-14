@@ -16,22 +16,21 @@ open EcLowPhlGoal
 open EcPhlCond
 
 (* -------------------------------------------------------------------- *)
-let process_cond (info : EcParsetree.pcond_info) tc =
+let process_cond info tc =
   let default_if (i : EcParsetree.codepos1 option) s =
     ofdfl (fun _ -> Zpr.cpos (tc1_pos_last_if tc s)) i in
 
   match info with
   | `Head side ->
-      t_hS_or_bhS_or_eS
-        ~th:t_hoare_cond ~tbh:t_bdhoare_cond ~te:(t_equiv_cond side)
-        tc
+    t_hS_or_bhS_or_eS
+      ~th:t_hoare_cond ~tbh:t_bdhoare_cond ~te:(t_equiv_cond side) tc
 
   | `Seq (side, (i1, i2), f) ->
     let es = tc1_as_equivS tc in
     let f  = EcProofTyping.tc1_process_prhl_formula tc f in
     let n1 = default_if i1 es.es_sl in
     let n2 = default_if i2 es.es_sr in
-    FApi.t_seqsub (EcPhlApp.t_equiv_app (n1,n2) f)
+    FApi.t_seqsub (EcPhlApp.t_equiv_app (n1, n2) f)
       [ t_id; t_equiv_cond side ] tc
 
   | `SeqOne (s, i, f1, f2) ->

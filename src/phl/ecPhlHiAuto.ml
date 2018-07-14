@@ -15,7 +15,6 @@ open EcModules
 open EcCoreGoal
 open EcLowGoal
 open EcLowPhlGoal
-open EcPhlAuto
 
 (* -------------------------------------------------------------------- *)
 type ll_strategy =
