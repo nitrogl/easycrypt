@@ -374,6 +374,7 @@
 %token ALGNORM
 %token ALIAS
 %token AMP
+%token ANTISLASH
 %token APPLY
 %token AS
 %token ASSERT
@@ -2185,6 +2186,9 @@ rwrepeat:
 | n=word NOT      { (`All  , Some n) }
 | n=word QUESTION { (`Maybe, Some n) }
 
+%inline rwrigid:
+| rg=boption(ANTISLASH) { rg }
+
 rwocc:
 | LBRACE       x=word+ RBRACE { (`Inclusive (EcMaps.Sint.of_list x)) }
 | LBRACE MINUS x=word+ RBRACE { (`Exclusive (EcMaps.Sint.of_list x)) }
@@ -2216,8 +2220,8 @@ rwarg1:
 | SLASHTILDEQ
    { RWSimpl `Variant }
 
-| s=rwside r=rwrepeat? o=rwocc? fp=rwpterms
-   { RWRw ((s, r, o), fp) }
+| s=rwside r=rwrepeat? o=rwocc? rg=rwrigid fp=rwpterms
+   { RWRw ((s, r, o), rg, fp) }
 
 | s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
    { RWDelta ((s, r, o), x); }

@@ -269,7 +269,9 @@ let pf_form_match (pt : pt_env) ?mode ~ptn subject =
 (* -------------------------------------------------------------------- *)
 exception FindOccFailure of [`MatchFailure | `IncompleteMatch]
 
-let rec pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
+let rec pf_find_occurence
+  (pt : pt_env) ?(keyed = false) ?(rigid = false) ~ptn subject
+=
   let module E = struct exception MatchFound end in
 
   let na = List.length (snd (EcFol.destr_app ptn)) in
@@ -297,7 +299,7 @@ let rec pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
   in
 
   let mode =
-    if   key = `NoKey
+    if   (key = `NoKey) || rigid
     then EcMatching.fmrigid
     else EcMatching.fmdelta in
 
@@ -342,10 +344,10 @@ let pf_find_occurence_lazy (pt : pt_env) ~ptn subject =
     pf_find_occurence pt ~keyed:false ~ptn subject; false
 
 
-let pf_find_occurence (pt : pt_env) ?(keyed = `No) ~ptn subject =
+let pf_find_occurence (pt : pt_env) ?rigid ?(keyed = `No) ~ptn subject =
   match keyed with
-  | `Yes  -> pf_find_occurence pt ~keyed:true  ~ptn subject
-  | `No   -> pf_find_occurence pt ~keyed:false ~ptn subject
+  | `Yes  -> pf_find_occurence pt ?rigid ~keyed:true  ~ptn subject
+  | `No   -> pf_find_occurence pt ?rigid ~keyed:false ~ptn subject
   | `Lazy -> ignore (pf_find_occurence_lazy pt ~ptn subject)
 
 (* -------------------------------------------------------------------- *)
