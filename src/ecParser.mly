@@ -374,7 +374,6 @@
 %token ALGNORM
 %token ALIAS
 %token AMP
-%token ANTISLASH
 %token APPLY
 %token AS
 %token ASSERT
@@ -2187,7 +2186,7 @@ rwrepeat:
 | n=word QUESTION { (`Maybe, Some n) }
 
 %inline rwrigid:
-| rg=boption(ANTISLASH) { rg }
+| rg=boption(RND) { rg }
 
 rwocc:
 | LBRACE       x=word+ RBRACE { (`Inclusive (EcMaps.Sint.of_list x)) }
