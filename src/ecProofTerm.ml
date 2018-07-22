@@ -299,9 +299,12 @@ let rec pf_find_occurence
   in
 
   let mode =
-    if   (key = `NoKey) || rigid
-    then EcMatching.fmrigid
-    else EcMatching.fmdelta in
+    if rigid then
+      EcMatching.fmsearch
+    else
+      if   (key = `NoKey) || rigid
+      then EcMatching.fmrigid
+      else EcMatching.fmdelta in
 
   let trymatch bds tp =
     if not (keycheck tp key) then `Continue else
