@@ -2186,7 +2186,7 @@ rwrepeat:
 | n=word QUESTION { (`Maybe, Some n) }
 
 %inline rwrigid:
-| rg=boption(RND) { rg }
+| rg=boption(SAMPLE) { rg }
 
 rwocc:
 | LBRACE       x=word+ RBRACE { (`Inclusive (EcMaps.Sint.of_list x)) }
