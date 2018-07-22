@@ -388,6 +388,7 @@ rule main = parse
   | "<$"  { [LESAMPLE  ] }
   | "<@"  { [LEAT      ] }
   | ":~"  { [COLONTILD ] }
+  | "\\"  { [ANTISLASH ] }
 
   | "/~="  { [SLASHTILDEQ     ] }
   | "//~=" { [SLASHSLASHTILDEQ] }
