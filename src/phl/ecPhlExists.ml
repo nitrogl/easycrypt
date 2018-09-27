@@ -129,15 +129,15 @@ let process_exists_intro ~(elim : bool) fs tc =
 (* -------------------------------------------------------------------- *)
 let process_ecall (l, tvi, fs) tc =
   let (hyps, concl) = FApi.tc1_flat tc in
-  let phyps =
+  let phyps, seq =
     match concl.f_node with
-    | FhoareF hf -> fst (LDecl.hoareF hf.hf_f hyps)
-    | FhoareS hs -> LDecl.push_active hs.hs_m hyps
-    | FbdHoareF bhf -> fst (LDecl.hoareF bhf.bhf_f hyps)
-    | FbdHoareS bhs -> LDecl.push_active bhs.bhs_m hyps
-    | FequivF ef -> fst (LDecl.equivF ef.ef_fl ef.ef_fr hyps)
-    | FequivS es -> LDecl.push_all [es.es_ml; es.es_mr] hyps
-    | _ -> tc_error_noXhl ~kinds:hlkinds_Xhl !!tc
+    | FhoareS hs ->
+        (LDecl.push_active hs.hs_m hyps,
+         EcPhlApp.t_hoare_app (Zpr.cpos (-1)))
+    | FequivS es ->
+        (LDecl.push_all [es.es_ml; es.es_mr] hyps,
+         EcPhlApp.t_equiv_app (Zpr.cpos (-1), Zpr.cpos (-1)))
+    | _ -> tc_error_noXhl ~kinds:[`Hoare `Stmt; `Equiv `Stmt] !!tc
   in
 
   let fs =
@@ -147,7 +147,7 @@ let process_ecall (l, tvi, fs) tc =
   in
 
   let ids, p1 =
-    let sub = EcPhlApp.t_hoare_app (Zpr.cpos (-1)) f_true tc in
+    let sub = seq f_true tc in
     let sub = FApi.t_rotate `Left 1 sub in
     let sub = FApi.t_focus (t_hr_exists_intro_r fs) sub in
     let sub = FApi.t_focus (t_hr_exists_elim_r ~bound:(List.length fs)) sub in
@@ -203,4 +203,6 @@ let process_ecall (l, tvi, fs) tc =
   let tc = FApi.t_focus (EcPhlCall.t_call None ax) tc in
   let tc = FApi.t_focus (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) tc in
 
-  tc
+  FApi.t_last
+    EcPhlAuto.t_auto
+    (FApi.t_rotate `Right 1 tc)
