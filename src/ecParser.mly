@@ -413,6 +413,7 @@
 %token DROP
 %token DUMP
 %token EAGER
+%token ECALL
 %token ELIF
 %token ELIM
 %token ELSE
@@ -634,6 +635,7 @@ _lident:
 | STRICT   { "strict"   }
 | WLOG     { "wlog"     }
 | EXLIM    { "exlim"    }
+| ECALL    { "ecall"    }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -2782,6 +2784,9 @@ phltactic:
     l=iplist1(sform, COMMA) %prec prec_below_comma
 
     { Phrex_intro (l, b) }
+
+| ECALL x=paren(p=qident tvi=tvars_app? fs=sform* { (p, tvi, fs) })
+    { Phecall x }
 
 | EXFALSO
     { Pexfalso }
