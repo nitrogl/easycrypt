@@ -585,7 +585,7 @@ type phltactic =
   | Pconseq        of (pcqoptions * (conseq_ppterm option tuple3))
   | Pconseqauto    of crushmode
   | Phrex_elim
-  | Phrex_intro    of pformula list
+  | Phrex_intro    of (pformula list * bool)
   | Pexfalso
   | Pbydeno        of ([`PHoare | `Equiv ] * (deno_ppterm * bool * pformula option))
   | PPr            of (pformula * pformula) option

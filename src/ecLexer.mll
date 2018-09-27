@@ -95,6 +95,7 @@
     "have"        , HAVE       ;        (* KW: tactic *)
     "suff"        , SUFF       ;        (* KW: tactic *)
     "elim"        , ELIM       ;        (* KW: tactic *)
+    "exlim"       , EXLIM      ;        (* KW: tactic *)
     "clear"       , CLEAR      ;        (* KW: tactic *)
     "wlog"        , WLOG       ;        (* KW: tactic *)
 

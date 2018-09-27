@@ -424,6 +424,7 @@
 %token EXACT
 %token EXFALSO
 %token EXIST
+%token EXLIM
 %token EXPECT
 %token EXPORT
 %token FEL
@@ -632,6 +633,7 @@ _lident:
 | SOLVE    { "solve"    }
 | STRICT   { "strict"   }
 | WLOG     { "wlog"     }
+| EXLIM    { "exlim"    }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -2776,8 +2778,10 @@ phltactic:
 | ELIM STAR
     { Phrex_elim }
 
-| EXIST STAR l=iplist1(sform, COMMA) %prec prec_below_comma
-    { Phrex_intro l }
+| b=ID(EXIST STAR { false } | EXLIM { true })
+    l=iplist1(sform, COMMA) %prec prec_below_comma
+
+    { Phrex_intro (l, b) }
 
 | EXFALSO
     { Pexfalso }

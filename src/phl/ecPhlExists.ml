@@ -17,6 +17,7 @@ open EcLowPhlGoal
 
 module TTC = EcProofTyping
 
+(* -------------------------------------------------------------------- *)
 let get_to_gens fs =
   let do_id f =
     let id =
@@ -28,9 +29,18 @@ let get_to_gens fs =
   List.map do_id fs
 
 (* -------------------------------------------------------------------- *)
-let t_hr_exists_elim_r tc =
+let t_hr_exists_elim_r ?bound tc =
   let pre = tc1_get_pre tc in
   let bd, pre = destr_exists_prenex pre in
+  let bd, pre =
+    bound
+      |> omap (fun bound ->
+             let bound = min bound (List.length bd) in
+             let bd1, bd2 = List.takedrop bound bd in
+
+             (bd1, f_exists bd2 pre))
+      |? (bd, pre) in
+
   (* FIXME: check that bd is not bound in the post *)
   let concl = f_forall bd (set_pre ~pre (FApi.tc1_goal tc)) in
   FApi.xmutate1 tc `HlExists [concl]
@@ -86,7 +96,7 @@ let t_hr_exists_elim  = FApi.t_low0 "hr-exists-elim"  t_hr_exists_elim_r
 let t_hr_exists_intro = FApi.t_low1 "hr-exists-intro" t_hr_exists_intro_r
 
 (* -------------------------------------------------------------------- *)
-let process_exists_intro fs tc =
+let process_exists_intro ~(elim : bool) fs tc =
   let (hyps, concl) = FApi.tc1_flat tc in
   let penv =
     match concl.f_node with
@@ -104,4 +114,9 @@ let process_exists_intro fs tc =
       (fun f -> TTC.pf_process_form_opt !!tc penv None f)
       fs
   in
-    t_hr_exists_intro fs tc
+
+  let tc = t_hr_exists_intro_r fs tc in
+
+  if elim then
+    t_hr_exists_elim_r ~bound:(List.length fs) (FApi.as_tcenv1 tc)
+  else tc
