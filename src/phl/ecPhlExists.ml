@@ -15,8 +15,12 @@ open EcCoreGoal
 open EcLowGoal
 open EcLowPhlGoal
 
+module L   = EcLocation
+module APT = EcParsetree
 module TTC = EcProofTyping
+module PT  = EcProofTerm
 
+(* -------------------------------------------------------------------- *)
 let get_to_gens fs =
   let do_id f =
     let id =
@@ -28,9 +32,20 @@ let get_to_gens fs =
   List.map do_id fs
 
 (* -------------------------------------------------------------------- *)
-let t_hr_exists_elim_r tc =
+let t_hr_exists_elim_r ?bound tc =
   let pre = tc1_get_pre tc in
-  let bd, pre = destr_exists_prenex pre in
+  let bd, pre =
+    try  destr_exists_prenex pre
+    with DestrError _ -> [], pre in
+  let bd, pre =
+    bound
+      |> omap (fun bound ->
+             let bound = min bound (List.length bd) in
+             let bd1, bd2 = List.takedrop bound bd in
+
+             (bd1, f_exists bd2 pre))
+      |? (bd, pre) in
+
   (* FIXME: check that bd is not bound in the post *)
   let concl = f_forall bd (set_pre ~pre (FApi.tc1_goal tc)) in
   FApi.xmutate1 tc `HlExists [concl]
@@ -86,7 +101,7 @@ let t_hr_exists_elim  = FApi.t_low0 "hr-exists-elim"  t_hr_exists_elim_r
 let t_hr_exists_intro = FApi.t_low1 "hr-exists-intro" t_hr_exists_intro_r
 
 (* -------------------------------------------------------------------- *)
-let process_exists_intro fs tc =
+let process_exists_intro ~(elim : bool) fs tc =
   let (hyps, concl) = FApi.tc1_flat tc in
   let penv =
     match concl.f_node with
@@ -104,4 +119,90 @@ let process_exists_intro fs tc =
       (fun f -> TTC.pf_process_form_opt !!tc penv None f)
       fs
   in
-    t_hr_exists_intro fs tc
+
+  let tc = t_hr_exists_intro_r fs tc in
+
+  if elim then
+    t_hr_exists_elim_r ~bound:(List.length fs) (FApi.as_tcenv1 tc)
+  else tc
+
+(* -------------------------------------------------------------------- *)
+let process_ecall (l, tvi, fs) tc =
+  let (hyps, concl) = FApi.tc1_flat tc in
+  let phyps, seq =
+    match concl.f_node with
+    | FhoareS hs ->
+        (LDecl.push_active hs.hs_m hyps,
+         EcPhlApp.t_hoare_app (Zpr.cpos (-1)))
+    | FequivS es ->
+        (LDecl.push_all [es.es_ml; es.es_mr] hyps,
+         EcPhlApp.t_equiv_app (Zpr.cpos (-1), Zpr.cpos (-1)))
+    | _ -> tc_error_noXhl ~kinds:[`Hoare `Stmt; `Equiv `Stmt] !!tc
+  in
+
+  let fs =
+    List.map
+      (fun f -> TTC.pf_process_form_opt !!tc phyps None f)
+      fs
+  in
+
+  let ids, p1 =
+    let sub = seq f_true tc in
+    let sub = FApi.t_rotate `Left 1 sub in
+    let sub = FApi.t_focus (t_hr_exists_intro_r fs) sub in
+    let sub = FApi.t_focus (t_hr_exists_elim_r ~bound:(List.length fs)) sub in
+
+    let ids =
+      try  fst (EcFol.destr_forall (FApi.tc_goal sub))
+      with DestrError _ -> [] in
+    let ids = List.map (snd_map gty_as_ty) ids in
+
+    let sub = FApi.t_focus (EcLowGoal.t_intros_i (List.fst ids)) sub in
+
+    let pte = PT.ptenv_of_penv (FApi.tc_hyps sub) !!tc in
+    let pt  = PT.process_pterm pte (APT.FPNamed (l, tvi)) in
+
+    let pt =
+      List.fold_left (fun pt (id, ty) ->
+          PT.apply_pterm_to_arg_r pt (PT.PVAFormula (f_local id ty)))
+        pt ids in
+
+    if not (PT.can_concretize pt.PT.ptev_env) then
+      assert false;
+    let _pt, ax = PT.concretize pt in
+
+    let sub = FApi.t_focus (EcPhlCall.t_call None ax) sub in
+    let sub = FApi.t_rotate `Left 1 sub in
+    let sub = oget (get_post (FApi.tc_goal sub)) in
+
+    let subst =
+      List.fold_left2
+        (fun s id f -> Fsubst.f_bind_local s id f)
+        Fsubst.f_subst_id (List.fst ids) fs in
+
+    (ids, Fsubst.f_subst subst sub) in
+
+  let tc = EcPhlApp.t_hoare_app (Zpr.cpos (-1)) p1 tc in
+  let tc = FApi.t_rotate `Left 1 tc in
+  let tc = FApi.t_focus (t_hr_exists_intro_r fs) tc in
+  let tc = FApi.t_focus (t_hr_exists_elim_r ~bound:(List.length fs)) tc in
+  let tc = FApi.t_focus (EcLowGoal.t_intros_i (List.fst ids)) tc in
+
+  let pte = PT.ptenv_of_penv (FApi.tc_hyps tc) (FApi.tc_penv tc) in
+  let pt  = PT.process_pterm pte (APT.FPNamed (l, tvi)) in
+
+  let pt =
+    List.fold_left (fun pt (id, ty) ->
+        PT.apply_pterm_to_arg_r pt (PT.PVAFormula (f_local id ty)))
+      pt ids in
+
+  if not (PT.can_concretize pt.PT.ptev_env) then
+    assert false;
+  let pt, ax = PT.concretize pt in
+
+  let tc = FApi.t_focus (EcPhlCall.t_call None ax) tc in
+  let tc = FApi.t_focus (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) tc in
+
+  FApi.t_last
+    EcPhlAuto.t_auto
+    (FApi.t_rotate `Right 1 tc)
