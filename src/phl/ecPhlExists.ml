@@ -10,6 +10,7 @@
 open EcUtils
 open EcFol
 open EcEnv
+open EcModules
 
 open EcCoreGoal
 open EcLowGoal
@@ -127,27 +128,45 @@ let process_exists_intro ~(elim : bool) fs tc =
   else tc
 
 (* -------------------------------------------------------------------- *)
-let process_ecall (l, tvi, fs) tc =
+let process_ecall oside (l, tvi, fs) tc =
   let (hyps, concl) = FApi.tc1_flat tc in
-  let phyps, seq =
+
+  let hyps, kind =
     match concl.f_node with
-    | FhoareS hs ->
-        (LDecl.push_active hs.hs_m hyps,
-         EcPhlApp.t_hoare_app (Zpr.cpos (-1)))
+    | FhoareS hs when is_none oside ->
+        (LDecl.push_active hs.hs_m hyps, `Hoare (List.length hs.hs_s.s_node))
     | FequivS es ->
-        (LDecl.push_all [es.es_ml; es.es_mr] hyps,
-         EcPhlApp.t_equiv_app (Zpr.cpos (-1), Zpr.cpos (-1)))
+        let n1 = List.length es.es_sl.s_node in
+        let n2 = List.length es.es_sr.s_node in
+        (LDecl.push_all [es.es_ml; es.es_mr] hyps, `Equiv (n1, n2))
     | _ -> tc_error_noXhl ~kinds:[`Hoare `Stmt; `Equiv `Stmt] !!tc
+  in
+
+  let t_local_seq p1 tc =
+    match kind, oside with
+    | `Hoare n, _ ->
+        EcPhlApp.t_hoare_app
+          (Zpr.cpos (n-1)) p1 tc
+    | `Equiv (n1, n2), None ->
+        EcPhlApp.t_equiv_app
+          (Zpr.cpos (n1-1), Zpr.cpos (n2-1)) p1 tc
+    | `Equiv (n1, n2), Some `Left ->
+        EcPhlApp.t_equiv_app
+          (Zpr.cpos (n1-1), Zpr.cpos n2) p1 tc
+    | `Equiv(n1, n2), Some `Right ->
+        EcPhlApp.t_equiv_app
+          (Zpr.cpos n1, Zpr.cpos (n2-1)) p1 tc
   in
 
   let fs =
     List.map
-      (fun f -> TTC.pf_process_form_opt !!tc phyps None f)
+      (fun f -> TTC.pf_process_form_opt !!tc hyps None f)
       fs
   in
 
   let ids, p1 =
-    let sub = seq f_true tc in
+    let sub = t_local_seq f_true tc in
+
     let sub = FApi.t_rotate `Left 1 sub in
     let sub = FApi.t_focus (t_hr_exists_intro_r fs) sub in
     let sub = FApi.t_focus (t_hr_exists_elim_r ~bound:(List.length fs)) sub in
@@ -158,7 +177,6 @@ let process_ecall (l, tvi, fs) tc =
     let ids = List.map (snd_map gty_as_ty) ids in
 
     let sub = FApi.t_focus (EcLowGoal.t_intros_i (List.fst ids)) sub in
-
     let pte = PT.ptenv_of_penv (FApi.tc_hyps sub) !!tc in
     let pt  = PT.process_pterm pte (APT.FPNamed (l, tvi)) in
 
@@ -167,11 +185,10 @@ let process_ecall (l, tvi, fs) tc =
           PT.apply_pterm_to_arg_r pt (PT.PVAFormula (f_local id ty)))
         pt ids in
 
-    if not (PT.can_concretize pt.PT.ptev_env) then
-      assert false;
+    assert (PT.can_concretize pt.PT.ptev_env);
     let _pt, ax = PT.concretize pt in
 
-    let sub = FApi.t_focus (EcPhlCall.t_call None ax) sub in
+    let sub = FApi.t_focus (EcPhlCall.t_call oside ax) sub in
     let sub = FApi.t_rotate `Left 1 sub in
     let sub = oget (get_post (FApi.tc_goal sub)) in
 
@@ -182,7 +199,7 @@ let process_ecall (l, tvi, fs) tc =
 
     (ids, Fsubst.f_subst subst sub) in
 
-  let tc = EcPhlApp.t_hoare_app (Zpr.cpos (-1)) p1 tc in
+  let tc = t_local_seq p1 tc in
   let tc = FApi.t_rotate `Left 1 tc in
   let tc = FApi.t_focus (t_hr_exists_intro_r fs) tc in
   let tc = FApi.t_focus (t_hr_exists_elim_r ~bound:(List.length fs)) tc in
@@ -196,13 +213,11 @@ let process_ecall (l, tvi, fs) tc =
         PT.apply_pterm_to_arg_r pt (PT.PVAFormula (f_local id ty)))
       pt ids in
 
-  if not (PT.can_concretize pt.PT.ptev_env) then
-    assert false;
+  assert (PT.can_concretize pt.PT.ptev_env);
+
   let pt, ax = PT.concretize pt in
 
-  let tc = FApi.t_focus (EcPhlCall.t_call None ax) tc in
+  let tc = FApi.t_focus (EcPhlCall.t_call oside ax) tc in
   let tc = FApi.t_focus (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) tc in
 
-  FApi.t_last
-    EcPhlAuto.t_auto
-    (FApi.t_rotate `Right 1 tc)
+  FApi.t_last EcPhlAuto.t_auto (FApi.t_rotate `Right 1 tc)

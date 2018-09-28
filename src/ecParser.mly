@@ -2818,8 +2818,8 @@ phltactic:
 
     { Phrex_intro (l, b) }
 
-| ECALL x=paren(p=qident tvi=tvars_app? fs=sform* { (p, tvi, fs) })
-    { Phecall x }
+| ECALL s=side? x=paren(p=qident tvi=tvars_app? fs=sform* { (p, tvi, fs) })
+    { Phecall (s, x) }
 
 | EXFALSO
     { Pexfalso }
