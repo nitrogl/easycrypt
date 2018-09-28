@@ -255,7 +255,7 @@ let t_call side ax tc =
   | FbdHoareF hf, FequivS _ ->
       let side =
         match side with
-        | None -> tc_error !!tc "side can only be given for prhl judgements"
+        | None -> tc_error !!tc "FIXME"
         | Some side -> side
       in
         t_equiv_call1 side hf.bhf_pr hf.bhf_po tc
