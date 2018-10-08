@@ -489,6 +489,6 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
         match pcs.(i) with
         | None -> ()
         | Some (_prover, pc) ->
-            CP.interrupt pc;
+            CP.interrupt_call pc;
             (try ignore (CP.wait_on_call pc : CP.prover_result) with _ -> ());
       done)
