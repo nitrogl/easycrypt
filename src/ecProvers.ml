@@ -316,7 +316,6 @@ type prover_infos = {
   pr_timelimit : int;
   pr_cpufactor : int;
   pr_quorum    : int;
-  pr_wrapper   : string option;
   pr_verbose   : int;
   pr_all       : bool;
   pr_max       : int;
@@ -333,7 +332,6 @@ let dft_prover_infos = {
   pr_timelimit = 3;
   pr_cpufactor = 1;
   pr_quorum    = 1;
-  pr_wrapper   = None;
   pr_verbose   = 0;
   pr_all       = false;
   pr_iterate   = false;
@@ -353,11 +351,6 @@ let rec run_prover ?(notify : notify option) (pi : prover_infos) (prover : strin
     let { pr_config = pr; pr_driver = dr; } = get_prover prover in
     let pc =
       let command = pr.Whyconf.command in
-      let command =
-        match pi.pr_wrapper with
-        | None -> command
-        | Some wrapper -> Printf.sprintf "%s %s" wrapper command
-      in
 
       let limit = { Call_provers.empty_limit with
         Call_provers.limit_time =

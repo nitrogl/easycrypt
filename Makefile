@@ -51,13 +51,13 @@ CHECKCATS ?= prelude stdlib
 # --------------------------------------------------------------------
 .PHONY: all build byte native tests check weak-check examples
 .PHONY: clean install uninstall uninstall-purge dist distcheck
-.PHONY: callprover license
+.PHONY: license
 .PHONY: %.ml %.mli %.inferred.mli
 
 all: build
 	@true
 
-build: callprover native
+build: native
 
 define do-core-build
 	$(OCAMLBUILD) "$(1)"
@@ -78,9 +78,6 @@ byte:
 native:
 	$(call do-build,ec.native)
 
-callprover:
-	$(MAKE) -C system
-
 define check-for-staled-files
 	if [ -d "$(DESTDIR)$(PREFIX)/lib/easycrypt/" ]; then   \
 	  cd "$(DESTDIR)$(LIBDIR)/" &&           \
@@ -95,7 +92,6 @@ install: build uninstall
 	$(INSTALL) -m 0755 -T ec.native $(DESTDIR)$(BINDIR)/easycrypt$(EXE)
 	$(INSTALL) -m 0755 -T scripts/testing/runtest $(DESTDIR)$(BINDIR)/ec-runtest$(EXE)
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(SYSDIR)
-	$(INSTALL) -m 0755 -T system/callprover$(EXE) $(DESTDIR)$(SYSDIR)/callprover$(EXE)
 	for i in $$(find theories -type d); do \
 	  $(INSTALL) -m 0755 -d $(DESTDIR)$(LIBDIR)/$$i ';'; \
 	  $(INSTALL) -m 0644 -t $(DESTDIR)$(LIBDIR)/$$i $$i/*.ec*; \
@@ -107,7 +103,6 @@ endef
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/easycrypt
-	rm -f $(DESTDIR)$(SYSDIR)/callprover
 	$(call rmdir,$(DESTDIR)$(SYSDIR))
 	for i in $$(find theories -depth -type d); do \
 	  for j in $$i/*.ec*; do rm -f $(DESTDIR)$(LIBDIR)/$$j; done; \
