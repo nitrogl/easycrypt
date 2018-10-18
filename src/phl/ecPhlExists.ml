@@ -176,7 +176,8 @@ let process_ecall oside (l, tvi, fs) tc =
       with DestrError _ -> [] in
     let ids = List.map (snd_map gty_as_ty) ids in
 
-    let sub = FApi.t_focus (EcLowGoal.t_intros_i (List.fst ids)) sub in
+    let nms = List.map (fun (_, x) -> (EcIdent.create "_", x)) ids in
+    let sub = FApi.t_focus (EcLowGoal.t_intros_i (List.fst nms)) sub in
     let pte = PT.ptenv_of_penv (FApi.tc_hyps sub) !!tc in
     let pt  = PT.process_pterm pte (APT.FPNamed (l, tvi)) in
 
@@ -197,7 +198,7 @@ let process_ecall oside (l, tvi, fs) tc =
         (fun s id f -> Fsubst.f_bind_local s id f)
         Fsubst.f_subst_id (List.fst ids) fs in
 
-    (ids, Fsubst.f_subst subst sub) in
+    (nms, Fsubst.f_subst subst sub) in
 
   let tc = t_local_seq p1 tc in
   let tc = FApi.t_rotate `Left 1 tc in
