@@ -480,21 +480,20 @@ lemma isdistr_drat (s : 'a list) : isdistr (mrat s).
 proof.
 rewrite /mrat; split=> /= [x|J uq_J].
   by rewrite divr_ge0 // le_fromint ?(count_ge0, size_ge0).
-rewrite -divr_suml -sumr_ofint; pose F := fun x => count (pred1 x) s.
-have := size_ge0 s; rewrite lez_eqVlt => -[<-//|nz_s].
-rewrite ler_pdivr_mulr ?lt_fromint // mul1r le_fromint.
-apply/(@lez_trans (BIA.big predT F (undup s))); last first.
-  by rewrite big_count filter_predT.
+rewrite -divr_suml -sumr_ofint; have := size_ge0 s.
+rewrite IntOrder.ler_eqVlt => -[<-//|nz_s].
+rewrite ler_pdivr_mulr 1?lt_fromint // mul1r le_fromint.
+rewrite -{2}(@filter_predT s) -big_count.
 have /BIA.eq_big_perm <- := perm_filterC (mem s) J.
-rewrite BIA.big_cat addzC BIA.big_seq BIA.big1 /=.
-  move=> x /mem_filter [@/predC h _] @/F; rewrite -count_eq0.
-  by move: h; apply/contra => /has_pred1.
+rewrite BIA.big_cat IntID.addrC BIA.big_seq BIA.big1 /=.
++ move=> i; rewrite mem_filter => -[@/predC i_notin_s _].
+  by rewrite -count_eq0 has_pred1.
 have /BIA.eq_big_perm <- := perm_filterC (mem J) (undup s).
-pose s1 := filter (mem s) J; pose s2 := filter (mem J) _.
-rewrite BIA.big_cat; suff: perm_eq s1 s2.
-  move/BIA.eq_big_perm=> <-; rewrite lez_addl sumr_ge0.
-  by move=> x _; apply/count_ge0.
-apply/uniq_perm_eq; rewrite ?filter_uniq ?undup_uniq //.
+rewrite BIA.big_cat ler_paddr ?sumr_ge0 /=.
++ by move=> x _; rewrite count_ge0.
+rewrite lerr_eq &(BIA.eq_big_perm) uniq_perm_eq //.
++ by rewrite filter_uniq.
++ by rewrite filter_uniq undup_uniq.
 by move=> x; rewrite !mem_filter mem_undup andbC.
 qed.
 
