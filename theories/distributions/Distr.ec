@@ -108,7 +108,7 @@ proof. by rewrite muE; apply/ge0_sum=> x /=; case: (p x). qed.
 
 hint exact : ge0_mu.
 
-lemma le1_mu (d : 'a distr) x : mu d x <= 1%r.
+lemma le1_mu (d : 'a distr) p : mu d p <= 1%r.
 proof. admitted.
 
 hint exact : le1_mu.
@@ -394,7 +394,8 @@ rewrite weightE_support; have {1}->: support d = mem (to_seq (support d)).
 rewrite mu_mem_uniq ?uniq_to_seq //=; pose F := fun y => mu1 d y.
 rewrite big_seq -(@eq_bigr _ (fun _ => mu1 d x)) /=.
   by move=> /= y; rewrite mem_to_seq // => yd; apply/uf_d.
-rewrite -big_seq Bigreal.sumr_const count_predT.
+rewrite -(@big_seq _ (to_seq (support d))).
+rewrite Bigreal.sumr_const count_predT.
 rewrite mulrAC divff // eq_fromint eq_sym eqr_le size_ge0 /=.
 by rewrite lezNgt /= -has_predT hasP; exists x; rewrite mem_to_seq.
 qed.
@@ -985,7 +986,6 @@ apply dscalar_uni =>//; smt (ge0_weight @Real).
 qed.
 
 (* -------------------------------------------------------------------- *)
-<<<<<<< HEAD
 op mprod ['a,'b] (ma : 'a -> real) (mb : 'b -> real) (ab : 'a * 'b) =
   (ma ab.`1) * (mb ab.`2).
 
