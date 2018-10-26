@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -231,6 +232,12 @@ proof. by move=> Hf Hu x y; apply: Hu; apply: Hf. qed.
 
 lemma nosmt funi_uni (d : 'a distr) : is_funiform d => is_uniform d.
 proof. by move=> h ????; apply: h. qed.
+
+lemma nosmt rnd_funi ['a] (d : 'a distr) :
+  is_funiform d => forall x y, mu1 d x = mu1 d y.
+proof. by apply. qed.
+
+hint solve 0 random : rnd_funi.
 
 (* -------------------------------------------------------------------- *)
 lemma mu_le (d : 'a distr) (p q : 'a -> bool):
@@ -827,7 +834,7 @@ qed.
 
 lemma weight_dmap (d : 'a distr) (f : 'a -> 'b) :
   weight (dmap d f) = weight d.
-proof. by rewrite /weight {2}(_: predT = preim f predT) // dmapE. qed.
+proof. by rewrite (_: predT = preim f predT) // dmapE. qed.
 
 lemma dmap_ll (d : 'a distr) (f : 'a -> 'b) : 
   is_lossless d => is_lossless (dmap d f).
@@ -979,6 +986,7 @@ apply dscalar_uni =>//; smt (ge0_weight @Real).
 qed.
 
 (* -------------------------------------------------------------------- *)
+<<<<<<< HEAD
 op mprod ['a,'b] (ma : 'a -> real) (mb : 'b -> real) (ab : 'a * 'b) =
   (ma ab.`1) * (mb ab.`2).
 

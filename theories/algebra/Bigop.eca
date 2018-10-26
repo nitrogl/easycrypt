@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -512,7 +513,7 @@ proof. by move=> lemn lenp; rewrite -big_cat -range_cat. qed.
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_int_recl (n m : int) F: m <= n =>
   bigi predT F m (n+1) = F m + bigi predT (fun i => F (i+1)) m n.
-proof. by move=> lemn; rewrite big_ltn 1?big_addn /= 1:smt addrK. qed.
+proof. by move=> lemn; rewrite big_ltn 1?big_addn /= 1:smt. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_int_recr (n m : int) F: m <= n =>

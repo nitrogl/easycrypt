@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -1144,6 +1145,12 @@ let destr_or  = destr_app2 ~name:"or"  is_op_or_any
 let destr_imp = destr_app2 ~name:"imp" is_op_imp
 let destr_iff = destr_app2 ~name:"iff" is_op_iff
 let destr_eq  = destr_app2 ~name:"eq"  is_op_eq
+
+let destr_and3 f =
+  try
+    let c1, (c2, c3) = snd_map destr_and (destr_and f)
+    in  (c1, c2, c3)
+  with DestrError _ -> raise (DestrError "and3")
 
 let destr_eq_or_iff =
   destr_app2 ~name:"eq-or-iff" (fun p -> is_op_eq p || is_op_iff p)
