@@ -127,6 +127,16 @@ lemma summable_mass_cond (d : 'a distr) (p : 'a -> bool) :
   summable (fun x => if p x then mass d x else 0%r).
 proof. by apply/summable_cond/summable_mass. qed.
 
+lemma summable_mass_wght (d : 'a distr) (F : 'a -> real) :
+     (forall x, 0%r <= F x <= 1%r)
+  => summable (fun x => mass d x * F x).
+proof.
+move=> dF; apply: (@summable_le (mass d)) => /= [|x].
++ by apply: summable_mass.
++ rewrite !ger0_norm ?mulr_ge0 //; first by case: (dF x).
+  by rewrite ler_pimulr //; case: (dF x).
+qed.
+
 lemma countable_mass ['a] (d : 'a distr):
   countable (fun x => mass d x <> 0%r).
 proof. by apply/sbl_countable/summable_mass. qed.
@@ -721,9 +731,15 @@ op dlet ['a 'b] (d : 'a distr) (f : 'a -> 'b distr) =
 lemma isdistr_mlet ['a 'b] (d : 'a distr) (f : 'a -> 'b distr) :
   isdistr (mlet d f).
 proof.
-split => [x|]; first by apply/ge0_sum=> y /=; rewrite mulr_ge0.
-move=> J uqJ @/mlet.
-admitted.
+split=> [x|]; first by apply/ge0_sum=> y /=; rewrite mulr_ge0.
+move=> J uqJ @/mlet; rewrite -sum_big /=.
++ by move=> y _; apply: summable_mass_wght.
+apply: (@ler_trans (sum (mass d))); last by rewrite -weightE.
+apply: RealSeries.ler_sum => /=.
++ by move=> x; rewrite -mulr_sumr ler_pimulr // (@le1_mass_fin (f x)).
++ by apply: summable_big => y _ /=; apply: summable_mass_wght.
++ by apply: summable_mass.
+qed.
 
 lemma dlet_massE (d : 'a distr) (f : 'a -> 'b distr) (b : 'b):
   mass (dlet d f) b = sum<:'a> (fun a => mass d a * mass (f a) b).

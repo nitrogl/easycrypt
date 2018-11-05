@@ -77,8 +77,13 @@ proof. by exists 0%r=> J uqJ; rewrite Bigreal.sumr_const normr0. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma eq_summable (s1 s2 : 'a -> real):
-  (forall x, s1 x = s2 x) =>  summable s1 <=> summable s2.
+  (forall x, s1 x = s2 x) => summable s1 <=> summable s2.
 proof. by move=> /fun_ext ->. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqL_summable (s1 s2 : 'a -> real):
+  summable s1 => (forall x, s1 x = s2 x) => summable s2.
+proof. by move=> sm1 /eq_summable <-. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt summableN (s : 'a -> real):
@@ -96,6 +101,20 @@ move=> [M1 leM1] [M2 leM2]; exists (M1 + M2)=> J uqJ.
 have /ler_add /(_ _ _ (leM2 J _)) := leM1 _ uqJ => // le.
 apply/(ler_trans _ _ le); rewrite -big_split /=; apply/ler_sum.
 by move=> a _ /=; apply/ler_norm_add.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt summable_big ['a 'b] (F : 'a -> 'b -> real) (s : 'b list) :
+     (forall y, y \in s => summable (fun x => F x y))
+  => summable (fun x => big predT (F x) s).
+proof.
+elim: s => [|y s ih] sm; first by apply: (eqL_summable _ summable0).
+have sm1: summable (fun x => F x y).
++ by apply: sm; rewrite in_cons.
+have sm2: summable (fun x => big predT (F x) s).
++ by apply: ih => z z_in_s; rewrite &(sm) in_cons z_in_s.
+apply: (eqL_summable _ (summableD sm1 sm2)) => /=.
+by move=> x; rewrite big_cons.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -467,6 +486,20 @@ have h2: support s2 <= E by move=> x @/E ->.
 rewrite !(@sumEw _ J E) //; first by move=> x @/E ->.
 rewrite -limD 1..2:&(summable_cnv _ enmJ) ~-1://.
 by apply/(@lim_eq 0)=> n ge0_n /=; rewrite big_split.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt sum_big ['a 'b] (F : 'a -> 'b -> real) (s : 'b list) :
+     (forall y, y \in s => summable (fun x => F x y))
+  =>   sum (fun x => big predT (F x) s)
+     = big predT (fun y => sum (fun x => F x y)) s.
+proof.
+elim: s => [|y s ih] sm; first by rewrite big_nil sum0.
+rewrite big_cons /predT /= -ih -?sumD /=.
++ by move=> z z_in_s; rewrite &(sm) in_cons z_in_s.
++ by rewrite &(sm) in_cons.
++ by apply: summable_big => z z_in_s; apply: sm; rewrite in_cons z_in_s.
+by apply: eq_sum => /= x; rewrite big_cons.
 qed.
 
 (* -------------------------------------------------------------------- *)
