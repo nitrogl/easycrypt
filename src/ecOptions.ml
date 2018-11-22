@@ -13,6 +13,7 @@ open EcMaps
 (* -------------------------------------------------------------------- *)
 type command = [
 | `Compile of cmp_option
+| `Latex   of ltx_option
 | `Cli     of cli_option
 | `Config
 | `Why3Config
@@ -27,6 +28,11 @@ and cmp_option = {
   cmpo_input   : string;
   cmpo_provers : prv_options;
   cmpo_gcstats : bool;
+}
+
+and ltx_option = {
+  ltx_input  : string;
+  ltx_target : string;
 }
 
 and cli_option = {
@@ -236,6 +242,8 @@ let specs = {
       `Group "provers";
       `Spec  ("gcstats", `Flag, "Display GC statistics")]);
 
+    ("latex", "Check an EasyCrypt file", [`Group "loader"]);
+
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
       `Group "provers";
@@ -356,6 +364,9 @@ let cmp_options_of_values ?ini values input =
     cmpo_provers = prv_options_of_values ?ini values;
     cmpo_gcstats = get_flag "gcstats" values; }
 
+let ltx_options_of_values ?ini _values input target =
+  ignore ini; { ltx_input = input; ltx_target = target }
+
 (* -------------------------------------------------------------------- *)
 let parse ?ini argv =
   let (command, values, anons) = parse specs argv in
@@ -365,6 +376,12 @@ let parse ?ini argv =
         match anons with
         | [input] -> `Compile (cmp_options_of_values ?ini values input)
         | _ -> raise (Arg.Bad "this command takes a single argument")
+    end
+
+    | "latex" -> begin
+        match anons with
+        | [input; target] -> `Latex (ltx_options_of_values ?ini values input target);
+        | _ -> raise (Arg.Bad "this command takes two arguments")
     end
 
     | "cli" ->

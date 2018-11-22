@@ -9,6 +9,7 @@
 (* -------------------------------------------------------------------- *)
 type command = [
 | `Compile of cmp_option
+| `Latex   of ltx_option
 | `Cli     of cli_option
 | `Config
 | `Why3Config
@@ -23,6 +24,11 @@ and cmp_option = {
   cmpo_input   : string;
   cmpo_provers : prv_options;
   cmpo_gcstats : bool;
+}
+
+and ltx_option = {
+  ltx_input  : string;
+  ltx_target : string;
 }
 
 and cli_option = {

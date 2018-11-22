@@ -259,6 +259,23 @@ let main () =
           ({cmpopts.cmpo_provers with prvo_iterate = true},
            Some name, terminal, false)
     end
+
+    | `Latex ltxopts -> begin
+        let name     = ltxopts.ltx_input in
+        let terminal = lazy (EcTerminal.from_channel ~name (open_in name)) in
+        let prvopts  = EcOptions.{
+          prvo_maxjobs   = 0;
+          prvo_timeout   = 0;
+          prvo_cpufactor = 1;
+          prvo_provers   = Some [];
+          prvo_pragmas   = ["Proofs:weak"];
+          prvo_ppwidth   = None;
+          prvo_checkall  = false;
+          prvo_profile   = false;
+          prvo_iterate   = true ;
+        }
+        in (prvopts, Some name, terminal, false)
+    end
   in
 
   (match input with
