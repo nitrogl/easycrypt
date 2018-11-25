@@ -136,6 +136,7 @@ case: (y' = y) => //= ne_y'y; rewrite !massE dprod1E.
 by rewrite dunit1E (@eq_sym y) ne_y'y.
 qed.
 
+(* -------------------------------------------------------------------- *)
 equiv SampleDepDLet :
   SampleDep.sample ~ SampleDLet.sample : true ==> ={res}.
 proof.
