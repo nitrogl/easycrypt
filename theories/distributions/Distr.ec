@@ -231,19 +231,30 @@ pred is_lossless (d : 'a distr) = weight d = 1%r.
 
 pred is_full (d : 'a distr) = forall x, x \in d.
 
-pred is_uniform (d : 'a distr) = forall (x y:'a),
+pred is_uniform (d : 'a distr) = forall (x y : 'a),
   x \in d => y \in d => mu1 d x = mu1 d y.
 
-pred is_funiform (d:'a distr) = forall (x y:'a),  mu1 d x = mu1 d y.
+pred is_funiform (d : 'a distr) = forall (x y : 'a), mu1 d x = mu1 d y.
 
 lemma is_full_funiform (d : 'a distr) : 
   is_full d => is_uniform d => is_funiform d.
 proof. by move=> Hf Hu x y; apply: Hu; apply: Hf. qed.
 
-lemma nosmt funi_uni (d : 'a distr) : is_funiform d => is_uniform d.
+lemma funi_uni (d : 'a distr) : is_funiform d => is_uniform d.
 proof. by move=> h ????; apply: h. qed.
 
-lemma nosmt rnd_funi ['a] (d : 'a distr) :
+lemma funi_ll_full (d : 'a distr) :
+  is_funiform d => is_lossless d => is_full d.
+proof.
+move=> funi_d ll_d x; suff: exists y, y \in d.
++ by case=> y; rewrite !supportP (@funi_d x y).
+move: ll_d; apply/contraLR; rewrite negb_exists /= => h.
+rewrite /is_lossless (_ : weight d = 0%r) // muE.
+rewrite sum0_eq //= => @/predT /= y.
+by rewrite massE -supportPn h.
+qed.
+
+lemma rnd_funi ['a] (d : 'a distr) :
   is_funiform d => forall x y, mu1 d x = mu1 d y.
 proof. by apply. qed.
 
@@ -1072,7 +1083,12 @@ qed.
 
 lemma dprod_fu (da : 'a distr) (db : 'b distr):
   is_full (da `*` db) <=> (is_full da /\ is_full db).
-proof. smt(supp_dprod). qed.
+proof.
+(split=> [h|[ha hb]]; first split) => x.
++ by move: (h (x, witness)); rewrite supp_dprod.
++ by move: (h (witness, x)); rewrite supp_dprod.
++ by rewrite supp_dprod !(ha, hb).
+qed.
 
 (* -------------------------------------------------------------------- *)
 op E ['a] (d : 'a distr) (f : 'a -> real) =
