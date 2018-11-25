@@ -516,6 +516,24 @@ by rewrite -limZ; apply/(@lim_eq 0) => n /= _; rewrite mulr_sumr.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma nosmt sum_split ['a] (s : 'a -> real) p : summable s => sum s =
+    sum (fun x => if  p x then s x else 0%r)
+  + sum (fun x => if !p x then s x else 0%r).
+proof.
+move=> sms; rewrite -sumD 1?summable_cond // &(eq_sum) /=.
+by move=> x; case: (p x).
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt sumD1 ['a] (s : 'a -> real) x0 : summable s => sum s =
+  s x0 + sum (fun x => if x <> x0 then s x else 0%r).
+proof.
+move=> sms; rewrite (@sum_split s (pred1 x0)) //=; congr=> //.
+rewrite (@sumE_fin _ [x0]) //= 1?big_seq1 //.
+by move=> @/pred1 x; case: (x = x0).
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt sump_eq0P (s : 'a -> real) :
      (forall x, 0%r <= s x)
   => summable s
