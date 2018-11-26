@@ -61,6 +61,18 @@ type mem_error =
 type filter_error =
 | FE_InvalidIndex of int
 
+type fxerror =
+| FXE_EmptyMatch
+| FXE_MatchParamsMixed
+| FXE_MatchParamsDup
+| FXE_MatchParamsUnk
+| FXE_MatchNonLinear
+| FXE_MatchDupBranches
+| FXE_MatchPartial
+| FXE_CtorUnk
+| FXE_CtorAmbiguous
+| FXE_CtorInvalidArity of (int * int)
+
 type tyerror =
 | UniVarNotAllowed
 | FreeTypeVariables
@@ -89,6 +101,7 @@ type tyerror =
 | TypeClassMismatch
 | TypeModMismatch        of mpath * module_type * tymod_cnv_failure
 | NotAFunction
+| NotAnInductive
 | AbbrevLowArgs
 | UnknownVarOrOp         of qsymbol * ty list
 | MultipleOpMatch        of qsymbol * ty list * (opmatch * EcUnify.unienv) list
@@ -102,7 +115,11 @@ type tyerror =
 | InvalidModType         of modtyp_error
 | InvalidModSig          of modsig_error
 | InvalidMem             of symbol * mem_error
+<<<<<<< HEAD
 | InvalidFilter          of filter_error
+=======
+| InvalidMatch           of fxerror
+>>>>>>> deploy-match-in-form
 | FunNotInModParam       of qsymbol
 | NoActiveMemory
 | PatternNotAllowed

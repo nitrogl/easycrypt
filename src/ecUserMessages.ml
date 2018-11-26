@@ -28,6 +28,7 @@ let set_ppo (newppo : pp_options) =
 module TypingError : sig
   open EcTyping
 
+  val pp_fxerror         : env -> Format.formatter -> fxerror -> unit
   val pp_tyerror         : env -> Format.formatter -> tyerror -> unit
   val pp_cnv_failure     : env -> Format.formatter -> tymod_cnv_failure -> unit
   val pp_mismatch_funsig : env -> Format.formatter -> mismatch_funsig -> unit
@@ -97,8 +98,6 @@ end = struct
         (EcPrinting.pp_modtype1 ppe) t2
         (pp_cnv_failure env) err
 
-
-
   let pp_modappl_error env fmt error =
     let msg x = Format.fprintf fmt x in
 
@@ -114,6 +113,40 @@ end = struct
 
     | MAE_AccesSubModFunctor ->
         msg "cannot access a sub-module of a partially applied functor"
+
+  let pp_fxerror _env fmt error =
+    let msg x = Format.fprintf fmt x in
+
+    match error with
+    | FXE_EmptyMatch ->
+        msg "this pattern matching has no branches"
+
+    | FXE_MatchParamsMixed ->
+        msg "this pattern matching matches on different parameters"
+
+    | FXE_MatchParamsDup ->
+        msg "this pattern matching matches a parameter twice"
+
+    | FXE_MatchParamsUnk ->
+        msg "this pattern matching matches an unbound parameter"
+
+    | FXE_MatchNonLinear ->
+        msg "this pattern is non-linear"
+
+    | FXE_MatchDupBranches ->
+        msg "this pattern matching contains duplicated branches"
+
+    | FXE_MatchPartial ->
+        msg "this pattern matching is non-exhaustive"
+
+    | FXE_CtorUnk ->
+        msg "unknown constructor name"
+
+    | FXE_CtorAmbiguous ->
+        msg "ambiguous constructor name"
+
+    | FXE_CtorInvalidArity _ ->
+        ()
 
   let pp_tyerror env1 fmt error =
     let env   = EcPrinting.PPEnv.ofenv env1 in
@@ -135,7 +168,6 @@ end = struct
           "only monomorphic types are allowed"
           "you may have to add type annotations"
           (fun fmt -> oiter (Format.fprintf fmt " on %s")) s
-
 
     | UnboundTypeParameter x ->
         msg "unbound type parameter: %s" x
@@ -214,6 +246,9 @@ end = struct
 
     | NotAFunction ->
         msg "the expression is not a function, it can not be applied"
+
+    | NotAnInductive ->
+        msg "the expression does not have an inductive type"
 
     | AbbrevLowArgs ->
         msg "this abbreviation is not applied enough"
@@ -336,6 +371,9 @@ end = struct
     | InvalidFilter (FE_InvalidIndex i) ->
         msg "invalid filter index: %d" i
 
+    | InvalidMatch fxerror ->
+        pp_fxerror env1 fmt fxerror
+
     | FunNotInModParam name ->
         msg "the function %a is not provided by a module parameter"
           pp_qsymbol name
@@ -444,41 +482,12 @@ end = struct
         msg "the datatype may be empty"
 
   let pp_fxerror env fmt error =
-    let msg x = Format.fprintf fmt x in
-
     match error with
-    | FXE_TypeError ee ->
+    | FXLowError ee ->
         pp_tyerror env fmt ee
 
-    | FXE_EmptyMatch ->
-        msg "this pattern matching has no branches"
-
-    | FXE_MatchParamsMixed ->
-        msg "this pattern matching matches on different parameters"
-
-    | FXE_MatchParamsDup ->
-        msg "this pattern matching matches a parameter twice"
-
-    | FXE_MatchParamsUnk ->
-        msg "this pattern matching matches an unbound parameter"
-
-    | FXE_MatchNonLinear ->
-        msg "this pattern is non-linear"
-
-    | FXE_MatchDupBranches ->
-        msg "this pattern matching contains duplicated branches"
-
-    | FXE_MatchPartial ->
-        msg "this pattern matching is non-exhaustive"
-
-    | FXE_CtorUnk ->
-        msg "unknown constructor name"
-
-    | FXE_CtorAmbiguous ->
-        msg "ambiguous constructor name"
-
-    | FXE_CtorInvalidArity _ ->
-        ()
+    | FXError ee ->
+        pp_fxerror env fmt ee
 end
 
 (* -------------------------------------------------------------------- *)
