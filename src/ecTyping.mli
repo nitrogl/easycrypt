@@ -115,11 +115,8 @@ type tyerror =
 | InvalidModType         of modtyp_error
 | InvalidModSig          of modsig_error
 | InvalidMem             of symbol * mem_error
-<<<<<<< HEAD
 | InvalidFilter          of filter_error
-=======
 | InvalidMatch           of fxerror
->>>>>>> deploy-match-in-form
 | FunNotInModParam       of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
