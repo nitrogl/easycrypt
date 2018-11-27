@@ -1029,13 +1029,15 @@ pffilter:
 
   { PFRange (flat, rg) }
 
-| LBRACE x=ident IN h=form_h RBRACE
+| LBRACE flat=iboption(SLASH) x=ident IN h=form_h RBRACE
 
-  { PFMatch (x, h) }
+  { PFMatch (flat, x, h) }
 
-| LBRACE f=form FOR xs=plist1(ident, COMMA) IN h=form_h RBRACE
+| LBRACE flat=iboption(SLASH)
+    f=form FOR xs=plist1(ident, COMMA) IN h=form_h
+  RBRACE
 
-  { PFMatchBuild (xs, f, h) }
+  { PFMatchBuild (flat, xs, f, h) }
 
 sform_u(P):
 | x=P

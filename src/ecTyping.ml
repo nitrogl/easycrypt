@@ -2191,7 +2191,8 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
                   let f = List.map (filter1 f) rgs in
                   f_ands (List.flatten f)
 
-              | PFMatch (x, ppt) ->
+              | PFMatch (deep, x, ppt) ->
+                  let f    = f_ands (flatten deep f) in
                   let x    = EcIdent.create (unloc x) in
                   let lenv = EcEnv.Var.bind_local x tbool env in
                   let ps   = ref Mid.empty in
@@ -2209,7 +2210,8 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
                   let subst = EcMatching.MEV.assubst ue ev in
                   Fsubst.f_subst subst (f_local x tbool)
 
-              | PFMatchBuild (xs, ptg, ppt) ->
+              | PFMatchBuild (deep, xs, ptg, ppt) ->
+                  let f    = f_ands (flatten deep f) in
                   let xs   = List.map (EcIdent.create |- unloc) xs in
                   let xst  = List.map (fun x -> (x, tbool)) xs in
                   let lenv = EcEnv.Var.bind_locals xst env in
