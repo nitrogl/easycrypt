@@ -1037,13 +1037,18 @@ pffilter:
 
   { PFRange (flat, rg) }
 
-| LBRACE x=ident IN h=form_h RBRACE
+| LBRACE flat=iboption(SLASH) x=ident IN h=form_h RBRACE
 
-  { PFMatch (x, h) }
+  { PFMatch (flat, x, h) }
 
-| LBRACE f=form FOR xs=plist1(ident, COMMA) IN h=form_h RBRACE
+| LBRACE flat=iboption(SLASH)
+    f=form FOR xs=plist1(ident, COMMA) IN h=form_h
+  RBRACE
 
-  { PFMatchBuild (xs, f, h) }
+  { PFMatchBuild (flat, xs, f, h) }
+
+| LBRACE flat=iboption(SLASH) TILD rooted=iboption(HAT) h=form_h RBRACE
+  { PFExclude (flat, rooted, h) }
 
 sform_u(P):
 | x=P
@@ -1064,11 +1069,11 @@ sform_u(P):
        PFscope (pqsymb_of_symb p.pl_loc "<top>", f)
      end }
 
-| LPAREN f=form_r(P) COLONTILD ty=loc(type_exp) RPAREN
-   { PFcast (f, ty) }
-
 | SHARP pf=pffilter* x=ident
    { PFref (x, pf) }
+
+| LPAREN f=form_r(P) COLONTILD ty=loc(type_exp) RPAREN
+   { PFcast (f, ty) }
 
 | n=uint
    { PFint n }

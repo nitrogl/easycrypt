@@ -2305,7 +2305,8 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
                   let f = List.map (filter1 f) rgs in
                   f_ands (List.flatten f)
 
-              | PFMatch (x, ppt) ->
+              | PFMatch (deep, x, ppt) ->
+                  let f    = f_ands (flatten deep f) in
                   let x    = EcIdent.create (unloc x) in
                   let lenv = EcEnv.Var.bind_local x tbool env in
                   let ps   = ref Mid.empty in
@@ -2323,7 +2324,8 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
                   let subst = EcMatching.MEV.assubst ue ev in
                   Fsubst.f_subst subst (f_local x tbool)
 
-              | PFMatchBuild (xs, ptg, ppt) ->
+              | PFMatchBuild (deep, xs, ptg, ppt) ->
+                  let f    = f_ands (flatten deep f) in
                   let xs   = List.map (EcIdent.create |- unloc) xs in
                   let xst  = List.map (fun x -> (x, tbool)) xs in
                   let lenv = EcEnv.Var.bind_locals xst env in
@@ -2342,6 +2344,41 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
 
                   let subst = EcMatching.MEV.assubst ue ev in
                   Fsubst.f_subst subst tg
+
+              | PFExclude (deep, rooted, ppt) ->
+                  let f    = flatten deep f in
+                  let ps   = ref Mid.empty in
+                  let ue   = EcUnify.UniEnv.create None in
+                  let pt   = trans_pattern env ps ue ppt in
+                  let ev   = EcMatching.MEV.of_idents (Mid.keys !ps) `Form in
+                  let mode = EcMatching.fmrigid in
+                  let hyps = EcEnv.LDecl.init env [] in
+
+                  let test target =
+                    try
+                      ignore (EcMatching.f_match mode hyps (ue, ev) ~ptn:pt target);
+                      false
+                    with EcMatching.MatchFailure -> true in
+
+                  let test target =
+                    if rooted then test target else
+
+                    let module E = struct exception MatchFound end in
+
+                    let test target =
+                      try
+                        ignore (EcMatching.f_match mode hyps (ue, ev) ~ptn:pt target);
+                        raise E.MatchFound
+                      with EcMatching.MatchFailure ->
+                        `Continue
+                    in
+
+                    try
+                      ignore (EcMatching.FPosition.select (fun _ -> test) target);
+                      true
+                    with E.MatchFound -> false
+
+                  in f_ands (List.filter test f)
 
             in List.fold_left filter f filters
     end
