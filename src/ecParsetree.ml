@@ -278,6 +278,7 @@ and pffilter =
 | PFRange      of bool * [ `Single of int | `Range of int option pair] list
 | PFMatch      of bool * psymbol * pformula
 | PFMatchBuild of bool * psymbol list * pformula * pformula
+| PFExclude    of bool * bool * pformula
 
 (* -------------------------------------------------------------------- *)
 let rec pf_ident ?(raw = false) f =
