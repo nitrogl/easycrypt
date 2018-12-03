@@ -68,6 +68,10 @@ val f_mu_x    : form -> form -> form
 val f_weight   : EcTypes.ty -> form -> form
 val f_lossless : EcTypes.ty -> form -> form
 
+(* soft constructors - leakable *)
+val f_is_leaked : EcTypes.ty -> form -> form
+val f_inst      : EcTypes.ty -> form -> form
+
 (* common functions *)
 val f_identity : ?name:EcSymbols.symbol -> EcTypes.ty -> form
 
@@ -124,8 +128,16 @@ val f_real_inv_simpl : form -> form
 val destr_exists_prenex : form -> bindings * form
 
 (* -------------------------------------------------------------------- *)
+(* projects 'a Constructor type into 'a *)
+val proj_constr_ty : EcEnv.env -> ty -> ty
+
+(* -------------------------------------------------------------------- *)
 (* projects 'a Distr type into 'a *)
 val proj_distr_ty : EcEnv.env -> ty -> ty
+
+(* -------------------------------------------------------------------- *)
+(* projects 'a leakable type into 'a *)
+val proj_leakable_ty : EcEnv.env -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
 type op_kind = [

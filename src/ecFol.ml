@@ -104,6 +104,13 @@ let f_real_div f1 f2 =
   f_real_mul f1 (f_real_inv f2)
 
 (* -------------------------------------------------------------------- *)
+let proj_constr_ty env ty =
+   match (EcEnv.Ty.hnorm ty env).ty_node with
+  | Tconstr(_,lty) when List.length lty = 1  ->
+    List.hd lty
+  | _ -> assert false
+  
+(* -------------------------------------------------------------------- *)
 let f_predT     ty = f_op CI.CI_Pred.p_predT [ty] (tcpred ty)
 let fop_pred1   ty = f_op CI.CI_Pred.p_pred1 [ty] (toarrow [ty; ty] tbool)
 
@@ -121,11 +128,7 @@ let f_pred1   f1    = f_app (fop_pred1 f1.f_ty) [f1] (toarrow [f1.f_ty] tbool)
 let f_mu_x    f1 f2 =
   f_app (fop_mu f2.f_ty) [f1; (f_pred1 f2)] treal
 
-let proj_distr_ty env ty =
-   match (EcEnv.Ty.hnorm ty env).ty_node with
-  | Tconstr(_,lty) when List.length lty = 1  ->
-    List.hd lty
-  | _ -> assert false
+let proj_distr_ty = proj_constr_ty
 
 let f_mu env f1 f2 =
   f_app (fop_mu (proj_distr_ty env f1.f_ty)) [f1; f2] treal
@@ -135,6 +138,19 @@ let f_weight ty d =
 
 let f_lossless ty d =
   f_app (fop_lossless ty) [d] tbool
+
+(* -------------------------------------------------------------------- *)
+let fop_is_leaked ty =
+  f_op CI.CI_Leakable.p_is_leaked  [ty] (toarrow [tleakable ty] tbool)
+let fop_inst      ty =
+  f_op CI.CI_Leakable.p_inst       [ty] (toarrow [tleakable ty] ty)
+
+let proj_leakable_ty = proj_constr_ty
+
+let f_is_leaked ty l =
+  f_app (fop_is_leaked ty) [l] tbool
+let f_inst ty l =
+  f_app (fop_inst ty) [l] ty
 
 (* -------------------------------------------------------------------- *)
 let f_losslessF f = f_bdHoareF f_true f f_true FHeq f_r1
@@ -755,7 +771,7 @@ let rec sform_of_form fp =
   | Fmatch (b, fs, ty)  -> SFmatch (b, fs, ty)
   | Flet   (lv, f1, f2) -> SFlet   (lv, f1, f2)
   | Ftuple fs           -> SFtuple fs
-  | Fproj (f, i)        -> SFproj  (f,i)
+  | Fproj  (f, i)       -> SFproj  (f,i)
 
   | Fquant (_, [ ]  , f) -> sform_of_form f
   | Fquant (q, [b]  , f) -> SFquant (q, b, lazy f)
