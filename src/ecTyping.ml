@@ -254,6 +254,11 @@ let (_i_inuse, s_inuse, se_inuse) =
       let map = s_inuse map s in
         map
 
+    | Smatch (e, bs) ->
+      let map = se_inuse map e in
+      let map = List.fold_left (fun map -> s_inuse map |- snd) map bs in
+        map
+
     | Sassert e ->
       se_inuse map e
 
@@ -2063,6 +2068,32 @@ and transinstr
       let body = transstmt env ue pbody in
       unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
       [ i_while (e, body) ]
+
+  | PSmatch (pe, pbranches) ->
+      let e, ety = transexp env `InProc ue pe in
+      let inddecl =
+        match (EcEnv.ty_hnorm ety env).ty_node with
+        | Tconstr (indp, _) -> begin
+            match EcEnv.Ty.by_path indp env with
+            | { tyd_type = `Datatype dt } ->
+                Some (indp, dt)
+            | _ -> None
+          end
+        | _ -> None in
+
+      let (_indp, inddecl) =
+        match inddecl with
+        | None   -> tyerror pe.pl_loc env NotAnInductive
+        | Some x -> x in
+
+      let branches =
+        trans_match ~loc:i.pl_loc env ue (ety, inddecl) pbranches in
+
+      let branches = List.map (fun (lcs, s) ->
+        let env = EcEnv.Var.bind_locals lcs env in
+        (lcs, transstmt env ue s)) branches in
+
+      [ i_match (e, branches) ]
 
   | PSassert pe ->
       let e, ety = transexp env `InProc ue pe in

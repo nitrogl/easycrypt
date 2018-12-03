@@ -1349,6 +1349,9 @@ instr:
 | WHILE LPAREN c=expr RPAREN b=block
    { PSwhile (c, b) }
 
+| MATCH c=expr WITH PIPE? bs=plist0(match_branch, PIPE) END SEMICOLON
+   { PSmatch (c, bs) }
+
 if_expr:
 | IF c=paren(expr) b=block el=if_else_expr
    { PSif ((c, b), fst el, snd el) }
@@ -1359,6 +1362,10 @@ if_else_expr:
 
 | ELIF e=paren(expr) b=block el=if_else_expr
     { ((e, b) :: fst el, snd el) }
+
+match_branch:
+| c=opptn IMPL b=block
+    { (c, b) }
 
 block:
 | i=loc(base_instr) SEMICOLON
@@ -1694,11 +1701,15 @@ opbr:
    { { pop_patterns = ptn; pop_body = e; } }
 
 %inline opcase:
-| x=ident EQ p=mcptn(sbinop)
+| x=ident EQ p=opptn
     { { pop_name = x; pop_pattern = p; } }
 
-| x=ident EQ p=paren(mcptn(binop))
-    { { pop_name = x; pop_pattern = p; } }
+%inline opptn:
+| p=mcptn(sbinop)
+    { p }
+
+| p=paren(mcptn(binop))
+    { p }
 
 mcptn(BOP):
 | c=qoident tvi=tvars_app? ps=bdident*
