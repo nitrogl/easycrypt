@@ -584,7 +584,9 @@ type phltactic =
   | Psplitwhile    of (pexpr * oside * codepos)
   | Pcall          of oside * call_info gppterm
   | Prcond         of (oside * bool * codepos1)
+  | Prmatch        of (oside * symbol * codepos1)
   | Pcond          of pcond_info
+  | Pmatch
   | Pswap          of ((oside * swap_kind) located list)
   | Pcfold         of (oside * codepos * int option)
   | Pinline        of inline_info
