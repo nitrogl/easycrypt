@@ -8,6 +8,7 @@
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcIdent
 open EcSymbols
 open EcTypes
 open EcDecl
@@ -94,11 +95,11 @@ module LowMatch = struct
   (* ------------------------------------------------------------------ *)
   let gen_rcond (pf, env) c m at_pos s =
     let head, i, tail = s_split_i at_pos s in
-    let e, (cname, cty), (cvars, subs) =
+    let e, infos, (cvars, subs) =
       match i.i_node with
       | Smatch (e, bs) -> begin
-          let typ, tyd, _ = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
-          let tyd = oget (EcDecl.tydecl_as_datatype tyd) in
+          let typ, tydc, tyinst = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
+          let tyd = oget (EcDecl.tydecl_as_datatype tydc) in
           let ctor =
             let test (_i : int) = sym_equal c -| fst in
             List.Exceptionless.findi test tyd.tydt_ctors in
@@ -109,10 +110,11 @@ module LowMatch = struct
                   Format.fprintf fmt
                     "cannot find the constructor %s" c)
 
-          | Some (i, (cname, cty)) ->
+          | Some (i, (cname, _cty)) ->
               let b = oget (List.nth_opt bs i) in
               let cname = EcPath.pqoname (EcPath.prefix typ) cname in
-              (e, (cname, cty), b)
+              let tyinst = List.combine tydc.tyd_params tyinst in
+              (e, ((typ, tyd, tyinst), cname), b)
         end
 
       | _ ->
@@ -121,25 +123,69 @@ module LowMatch = struct
               "the targetted instruction is not a match")
     in
 
-    let e = form_of_expr m e in
+    let f = form_of_expr m e in
 
-    (stmt head, e, stmt (head @ subs.s_node @ tail))
+    ((stmt head, subs, tail), (e, f), infos, cvars)
 
   (* ------------------------------------------------------------------ *)
   let t_hoare_rcond_match_r c at_pos tc =
     let hs = tc1_as_hoareS tc in
     let m  = EcMemory.memory hs.hs_m in
-    let hd, _e, s = gen_rcond (!!tc, FApi.tc1_env tc) c m at_pos hs.hs_s in
-    let concl1  = f_hoareS_r { hs with hs_s = hd; hs_po = f_true; } in
-    let concl2  = f_hoareS_r { hs with hs_s = s; } in
+    let (hd, s, tl), (e, f), ((typ, _tyd, tyinst), cname), cvars =
+      gen_rcond (!!tc, FApi.tc1_env tc) c m at_pos hs.hs_s in
+
+    let po1 =
+      let names = List.map (
+        fun (x, xty) ->
+          let x =
+            if   EcIdent.name x = "_"
+            then EcIdent.create (symbol_of_ty xty)
+            else EcIdent.fresh x
+          in (x, xty)) cvars in
+      let vars  = List.map (curry f_local) names in
+      let po = f_op cname (List.snd tyinst) f.f_ty in
+      let po = f_app po vars f.f_ty in
+      f_exists (List.map (snd_map gtty) names) (f_eq f po) in
+
+    let me, pvs = List.fold_left_map (fun m (x, xty) ->
+        let var = { v_name = EcIdent.name x; v_type = xty; } in
+        EcLowPhlGoal.fresh_pv m var
+      ) hs.hs_m cvars in
+
+    let subst, pvs =
+      let px = EcMemory.xpath hs.hs_m in
+      let s, pvs =
+        List.fold_left_map (fun s ((x, xty), name) ->
+            let pv = pv_loc px name in
+            let s  = Mid.add x (e_var pv xty) s in
+            (s, (pv, xty)))
+          Mid.empty (List.combine cvars pvs) in
+      ({ e_subst_id with es_loc = s; }, pvs) in
+
+    let asgn =
+      EcModules.lv_of_list pvs |> omap (fun lv ->
+        (* FIXME: factorize out *)
+        let rty  = ttuple (List.snd cvars) in
+        let proj = EcInductive.datatype_proj_path typ (EcPath.basename cname) in
+        let proj = e_op proj (List.snd tyinst) (tfun e.e_ty (toption rty)) in
+        let proj = e_app proj [e] (toption rty) in
+        let proj = e_oget proj rty in
+        i_asgn (lv, proj)) in
+
+    let asgn = otolist asgn in
+
+    let concl1  = f_hoareS_r { hs with hs_s = hd; hs_po = po1; } in
+    let concl2  = f_hoareS_r {
+      hs with hs_m = me; hs_s = stmt (asgn @ (s_subst subst s).s_node @ tl); } in
+
     FApi.xmutate1 tc `RCondMatch [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
-  let t_bdhoare_rcond_match_r c at_pos tc =
+  let t_bdhoare_rcond_match_r _c _at_pos tc =
     EcLowGoal.t_id tc
 
   (* ------------------------------------------------------------------ *)
-  let t_equiv_rcond_match_r side c at_pos tc =
+  let t_equiv_rcond_match_r _side _c _at_pos tc =
     EcLowGoal.t_id tc
 
   (* ------------------------------------------------------------------ *)
