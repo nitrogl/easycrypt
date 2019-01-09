@@ -127,13 +127,15 @@ module Mpv = struct
     let ssubst = ssubst env s in
 
     match i.i_node with
-    | Sasgn  (lv, e)     -> i_asgn   (lvsubst env s lv, esubst e)
-    | Srnd   (lv, e)     -> i_rnd    (lvsubst env s lv, esubst e)
-    | Scall  (lv, f, es) -> i_call   (lv |> omap (lvsubst env s), f, List.map esubst es)
-    | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
-    | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
-    | Sassert e          -> i_assert (esubst e)
-    | Sabstract _        -> i
+    | Sasgn     (lv, e)     -> i_asgn    (lvsubst env s lv, esubst e)
+    | Ssecasgn  (lv, e)     -> i_secasgn (lvsubst env s lv, esubst e)
+    | Srnd      (lv, e)     -> i_rnd     (lvsubst env s lv, esubst e)
+    | Ssecrnd   (lv, e)     -> i_secrnd  (lvsubst env s lv, esubst e)
+    | Scall     (lv, f, es) -> i_call    (lv |> omap (lvsubst env s), f, List.map esubst es)
+    | Sif       (c, s1, s2) -> i_if      (esubst c, ssubst s1, ssubst s2)
+    | Swhile    (e, stmt)   -> i_while   (esubst e, ssubst stmt)
+    | Sassert   e           -> i_assert  (esubst e)
+    | Sabstract _           -> i
 
   and issubst env (s : esubst) (is : instr list) =
     List.map (isubst env s) is
@@ -465,9 +467,11 @@ and s_write_r ?(except=Sx.empty) env w s =
 
 and i_write_r ?(except=Sx.empty) env w i =
   match i.i_node with
-  | Sasgn  (lp, _) -> lp_write_r env w lp
-  | Srnd   (lp, _) -> lp_write_r env w lp
-  | Sassert _      -> w
+  | Sasgn    (lp, _) -> lp_write_r env w lp
+  | Ssecasgn (lp, _) -> lp_write_r env w lp
+  | Srnd     (lp, _) -> lp_write_r env w lp
+  | Ssecrnd  (lp, _) -> lp_write_r env w lp
+  | Sassert  _       -> w
 
   | Scall(lp,f,_) ->
     if Sx.mem f except then w else
@@ -530,7 +534,9 @@ and s_read_r env w s =
 and i_read_r env r i =
   match i.i_node with
   | Sasgn   (lp, e) -> e_read_r env (lp_read_r env r lp) e
+  | Ssecasgn(lp, e) -> e_read_r env (lp_read_r env r lp) e
   | Srnd    (lp, e) -> e_read_r env (lp_read_r env r lp) e
+  | Ssecrnd (lp, e) -> e_read_r env (lp_read_r env r lp) e
   | Sassert e       -> e_read_r env r e
 
   | Scall (lp, f, es) ->
@@ -966,7 +972,13 @@ and i_eqobs_in_refl env i eqo =
       add_eqs_refl env (remove_refl env lv eqo) e
     else eqo
 
+  | Ssecasgn(lv,e) ->
+    add_eqs_refl env (remove_refl env lv eqo) e
+
   | Srnd(lv,e) ->
+    add_eqs_refl env (remove_refl env lv eqo) e
+
+  | Ssecrnd(lv,e) ->
     add_eqs_refl env (remove_refl env lv eqo) e
 
   | Scall(lv,f,args) ->

@@ -120,7 +120,7 @@ let on_mpath_lv cb (lv : lvalue) =
 
 let rec on_mpath_instr cb (i : instr)=
   match i.i_node with
-  | Srnd (lv, e) | Sasgn (lv, e) ->
+  | Srnd (lv, e) | Sasgn (lv, e) | Ssecasgn (lv, e) | Ssecrnd (lv, e) ->
       on_mpath_lv cb lv;
       on_mpath_expr cb e
 

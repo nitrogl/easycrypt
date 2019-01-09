@@ -85,7 +85,9 @@ type instr = {
 
 and instr_node =
   | Sasgn     of lvalue * EcTypes.expr
+  | Ssecasgn  of lvalue * EcTypes.expr
   | Srnd      of lvalue * EcTypes.expr
+  | Ssecrnd   of lvalue * EcTypes.expr
   | Scall     of lvalue option * EcPath.xpath * EcTypes.expr list
   | Sif       of EcTypes.expr * stmt * stmt
   | Swhile    of EcTypes.expr * stmt
@@ -119,7 +121,13 @@ module Hinstr = Why3.Hashcons.Make (struct
     | Sasgn (lv1, e1), Sasgn (lv2, e2) ->
         (lv_equal lv1 lv2) && (EcTypes.e_equal e1 e2)
 
+    | Ssecasgn (lv1, e1), Ssecasgn (lv2, e2) ->
+        (lv_equal lv1 lv2) && (EcTypes.e_equal e1 e2)
+
     | Srnd (lv1, e1), Srnd (lv2, e2) ->
+        (lv_equal lv1 lv2) && (EcTypes.e_equal e1 e2)
+
+    | Ssecrnd (lv1, e1), Ssecrnd (lv2, e2) ->
         (lv_equal lv1 lv2) && (EcTypes.e_equal e1 e2)
 
     | Scall (lv1, f1, es1), Scall (lv2, f2, es2) ->
@@ -151,7 +159,15 @@ module Hinstr = Why3.Hashcons.Make (struct
         Why3.Hashcons.combine
           (Hashtbl.hash lv) (EcTypes.e_hash e)
 
+    | Ssecasgn (lv, e) ->
+        Why3.Hashcons.combine
+          (Hashtbl.hash lv) (EcTypes.e_hash e)
+
     | Srnd (lv, e) ->
+        Why3.Hashcons.combine
+          (Hashtbl.hash lv) (EcTypes.e_hash e)
+
+    | Ssecrnd (lv, e) ->
         Why3.Hashcons.combine
           (Hashtbl.hash lv) (EcTypes.e_hash e)
 
@@ -176,7 +192,13 @@ module Hinstr = Why3.Hashcons.Make (struct
     | Sasgn (lv, e) ->
         EcIdent.fv_union (lv_fv lv) (EcTypes.e_fv e)
 
+    | Ssecasgn (lv, e) ->
+        EcIdent.fv_union (lv_fv lv) (EcTypes.e_fv e)
+
     | Srnd (lv, e) ->
+        EcIdent.fv_union (lv_fv lv) (EcTypes.e_fv e)
+
+    | Ssecrnd (lv, e) ->
         EcIdent.fv_union (lv_fv lv) (EcTypes.e_fv e)
 
     | Scall (olv, f, args) ->
@@ -239,7 +261,9 @@ let rstmt s = stmt (List.rev s)
 
 (* --------------------------------------------------------------------- *)
 let i_asgn     (lv, e)      = mk_instr (Sasgn (lv, e))
+let i_secasgn  (lv, e)      = mk_instr (Ssecasgn (lv, e))
 let i_rnd      (lv, e)      = mk_instr (Srnd (lv, e))
+let i_secrnd   (lv, e)      = mk_instr (Ssecrnd (lv, e))
 let i_call     (lv, m, tys) = mk_instr (Scall (lv, m, tys))
 let i_if       (c, s1, s2)  = mk_instr (Sif (c, s1, s2))
 let i_while    (c, s)       = mk_instr (Swhile (c, s))
@@ -250,7 +274,9 @@ let s_seq      s1 s2        = stmt (s1.s_node @ s2.s_node)
 let s_empty                 = stmt []
 
 let s_asgn     arg = stmt [i_asgn arg]
+let s_secasgn  arg = stmt [i_secasgn arg]
 let s_rnd      arg = stmt [i_rnd arg]
+let s_secrnd   arg = stmt [i_secrnd arg]
 let s_call     arg = stmt [i_call arg]
 let s_if       arg = stmt [i_if arg]
 let s_while    arg = stmt [i_while arg]
@@ -262,7 +288,15 @@ let get_asgn = function
   | { i_node = Sasgn (lv, e) } -> Some (lv, e)
   | _ -> None
 
+let get_secasgn = function
+  | { i_node = Ssecasgn (lv, e) } -> Some (lv, e)
+  | _ -> None
+
 let get_rnd = function
+  | { i_node = Srnd (lv, e) } -> Some (lv, e)
+  | _ -> None
+
+let get_secrnd = function
   | { i_node = Srnd (lv, e) } -> Some (lv, e)
   | _ -> None
 
@@ -286,23 +320,27 @@ let get_assert = function
 let _destr_of_get (get : instr -> 'a option) (i : instr) =
   match get i with Some x -> x | None -> raise Not_found
 
-let destr_asgn   = _destr_of_get get_asgn
-let destr_rnd    = _destr_of_get get_rnd
-let destr_call   = _destr_of_get get_call
-let destr_if     = _destr_of_get get_if
-let destr_while  = _destr_of_get get_while
-let destr_assert = _destr_of_get get_assert
+let destr_asgn    = _destr_of_get get_asgn
+let destr_secasgn = _destr_of_get get_secasgn
+let destr_rnd     = _destr_of_get get_rnd
+let destr_secrnd  = _destr_of_get get_secrnd
+let destr_call    = _destr_of_get get_call
+let destr_if      = _destr_of_get get_if
+let destr_while   = _destr_of_get get_while
+let destr_assert  = _destr_of_get get_assert
 
 (* -------------------------------------------------------------------- *)
 let _is_of_get (get : instr -> 'a option) (i : instr) =
   EcUtils.is_some (get i)
 
-let is_asgn   = _is_of_get get_asgn
-let is_rnd    = _is_of_get get_rnd
-let is_call   = _is_of_get get_call
-let is_if     = _is_of_get get_if
-let is_while  = _is_of_get get_while
-let is_assert = _is_of_get get_assert
+let is_asgn    = _is_of_get get_asgn
+let is_secasgn = _is_of_get get_secasgn
+let is_rnd     = _is_of_get get_rnd
+let is_secrnd  = _is_of_get get_secrnd
+let is_call    = _is_of_get get_call
+let is_if      = _is_of_get get_if
+let is_while   = _is_of_get get_while
+let is_assert  = _is_of_get get_assert
 
 (* -------------------------------------------------------------------- *)
 module ISmart : sig
@@ -315,7 +353,9 @@ module ISmart : sig
   val lv_map   : lvalue * lv_map   -> lv_map   -> lvalue
 
   type i_asgn     = lvalue * EcTypes.expr
+  type i_secasgn  = lvalue * EcTypes.expr
   type i_rnd      = lvalue * EcTypes.expr
+  type i_secrnd   = lvalue * EcTypes.expr
   type i_call     = lvalue option * EcPath.xpath * EcTypes.expr list
   type i_if       = EcTypes.expr * stmt * stmt
   type i_while    = EcTypes.expr * stmt
@@ -323,7 +363,9 @@ module ISmart : sig
   type i_abstract = EcIdent.t
 
   val i_asgn     : (instr * i_asgn    ) -> i_asgn     -> instr
+  val i_secasgn  : (instr * i_secasgn ) -> i_secasgn  -> instr
   val i_rnd      : (instr * i_rnd     ) -> i_rnd      -> instr
+  val i_secrnd   : (instr * i_secrnd  ) -> i_secrnd   -> instr
   val i_call     : (instr * i_call    ) -> i_call     -> instr
   val i_if       : (instr * i_if      ) -> i_if       -> instr
   val i_while    : (instr * i_while   ) -> i_while    -> instr
@@ -337,7 +379,9 @@ end = struct
   type lv_map   = lvmap
 
   type i_asgn     = lvalue * EcTypes.expr
+  type i_secasgn  = lvalue * EcTypes.expr
   type i_rnd      = lvalue * EcTypes.expr
+  type i_secrnd   = lvalue * EcTypes.expr
   type i_call     = lvalue option * EcPath.xpath * EcTypes.expr list
   type i_if       = EcTypes.expr * stmt * stmt
   type i_while    = EcTypes.expr * stmt
@@ -358,8 +402,14 @@ end = struct
   let i_asgn (i, (lv, e)) (lv', e') =
     if lv == lv' && e == e' then i else i_asgn (lv', e')
 
+  let i_secasgn (i, (lv, e)) (lv', e') =
+    if lv == lv' && e == e' then i else i_secasgn (lv', e')
+
   let i_rnd (i, (lv, e)) (lv', e') =
     if lv == lv' && e == e' then i else i_rnd (lv', e')
+
+  let i_secrnd (i, (lv, e)) (lv', e') =
+    if lv == lv' && e == e' then i else i_secrnd (lv', e')
 
   let i_call (i, (olv, mp, args)) (olv', mp', args') =
     if   olv == olv' && mp == mp' && args == args'
@@ -418,8 +468,14 @@ let s_subst (s : EcTypes.e_subst) =
     | Sasgn (lv, e) ->
         ISmart.i_asgn (i, (lv, e)) (lv_subst lv, e_subst e)
 
+    | Ssecasgn (lv, e) ->
+        ISmart.i_secasgn (i, (lv, e)) (lv_subst lv, e_subst e)
+
     | Srnd (lv, e) ->
         ISmart.i_rnd (i, (lv, e)) (lv_subst lv, e_subst e)
+
+    | Ssecrnd (lv, e) ->
+        ISmart.i_secrnd (i, (lv, e)) (lv_subst lv, e_subst e)
 
     | Scall (olv, mp, args) ->
         let olv'  = olv |> OSmart.omap lv_subst in
@@ -486,7 +542,7 @@ and s_get_uninit_read (w : Sx.t) (s : stmt) =
 
 and i_get_uninit_read (w : Sx.t) (i : instr) =
   match i.i_node with
-  | Sasgn (lv, e) | Srnd (lv, e) ->
+  | Sasgn (lv, e) | Ssecasgn (lv, e) | Srnd (lv, e) | Ssecrnd (lv, e) ->
       let     r1 = Sx.diff (Uninit.e_pv is_loc e) w in
       let w2, r2 = lv_get_uninit_read w lv in
       (Sx.union w w2, Sx.union r1 r2)

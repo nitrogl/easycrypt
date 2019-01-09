@@ -37,7 +37,9 @@ type instr = private {
 
 and instr_node =
   | Sasgn     of lvalue * expr
+  | Ssecasgn  of lvalue * expr
   | Srnd      of lvalue * expr
+  | Ssecrnd   of lvalue * expr
   | Scall     of lvalue option * xpath * expr list
   | Sif       of expr * stmt * stmt
   | Swhile    of expr * stmt
@@ -65,7 +67,9 @@ val s_subst   : e_subst -> stmt -> stmt
 
 (* -------------------------------------------------------------------- *)
 val i_asgn     : lvalue * expr -> instr
+val i_secasgn  : lvalue * expr -> instr
 val i_rnd      : lvalue * expr -> instr
+val i_secrnd   : lvalue * expr -> instr
 val i_call     : lvalue option * xpath * expr list -> instr
 val i_if       : expr * stmt * stmt -> instr
 val i_while    : expr * stmt -> instr
@@ -73,7 +77,9 @@ val i_assert   : expr -> instr
 val i_abstract : EcIdent.t -> instr
 
 val s_asgn     : lvalue * expr -> stmt
+val s_secasgn  : lvalue * expr -> stmt
 val s_rnd      : lvalue * expr -> stmt
+val s_secrnd   : lvalue * expr -> stmt
 val s_call     : lvalue option * xpath * expr list -> stmt
 val s_if       : expr * stmt * stmt -> stmt
 val s_while    : expr * stmt -> stmt
@@ -86,19 +92,23 @@ val stmt  : instr list -> stmt
 val rstmt : instr list -> stmt
 
 (* the following functions raise Not_found if the argument does not match *)
-val destr_asgn   : instr -> lvalue * expr
-val destr_rnd    : instr -> lvalue * expr
-val destr_call   : instr -> lvalue option * xpath * expr list
-val destr_if     : instr -> expr * stmt * stmt
-val destr_while  : instr -> expr * stmt
-val destr_assert : instr -> expr
+val destr_asgn    : instr -> lvalue * expr
+val destr_secasgn : instr -> lvalue * expr
+val destr_rnd     : instr -> lvalue * expr
+val destr_secrnd  : instr -> lvalue * expr
+val destr_call    : instr -> lvalue option * xpath * expr list
+val destr_if      : instr -> expr * stmt * stmt
+val destr_while   : instr -> expr * stmt
+val destr_assert  : instr -> expr
 
-val is_asgn   : instr -> bool
-val is_rnd    : instr -> bool
-val is_call   : instr -> bool
-val is_if     : instr -> bool
-val is_while  : instr -> bool
-val is_assert : instr -> bool
+val is_asgn    : instr -> bool
+val is_secasgn : instr -> bool
+val is_rnd     : instr -> bool
+val is_secrnd  : instr -> bool
+val is_call    : instr -> bool
+val is_if      : instr -> bool
+val is_while   : instr -> bool
+val is_assert  : instr -> bool
 
 (* -------------------------------------------------------------------- *)
 val get_uninit_read : stmt -> Sx.t

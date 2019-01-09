@@ -93,36 +93,40 @@ let pf_last_gen _kind proj pe s =
   | Some x -> x
 
 (* -------------------------------------------------------------------- *)
-let pf_first_asgn   pe st = pf_first_gen  "asgn"   destr_asgn   pe st
-let pf_first_rnd    pe st = pf_first_gen  "rnd"    destr_rnd    pe st
-let pf_first_call   pe st = pf_first_gen  "call"   destr_call   pe st
-let pf_first_if     pe st = pf_first_gen  "if"     destr_if     pe st
-let pf_first_while  pe st = pf_first_gen  "while"  destr_while  pe st
-let pf_first_assert pe st = pf_first_gen  "assert" destr_assert pe st
+let pf_first_asgn    pe st = pf_first_gen  "asgn"    destr_asgn    pe st
+let pf_first_secasgn pe st = pf_first_gen  "secasgn" destr_secasgn pe st
+let pf_first_rnd     pe st = pf_first_gen  "rnd"     destr_rnd     pe st
+let pf_first_call    pe st = pf_first_gen  "call"    destr_call    pe st
+let pf_first_if      pe st = pf_first_gen  "if"      destr_if      pe st
+let pf_first_while   pe st = pf_first_gen  "while"   destr_while   pe st
+let pf_first_assert  pe st = pf_first_gen  "assert"  destr_assert  pe st
 
 (* -------------------------------------------------------------------- *)
-let pf_last_asgn   pe st = pf_last_gen  "asgn"   destr_asgn   pe st
-let pf_last_rnd    pe st = pf_last_gen  "rnd"    destr_rnd    pe st
-let pf_last_call   pe st = pf_last_gen  "call"   destr_call   pe st
-let pf_last_if     pe st = pf_last_gen  "if"     destr_if     pe st
-let pf_last_while  pe st = pf_last_gen  "while"  destr_while  pe st
-let pf_last_assert pe st = pf_last_gen  "assert" destr_assert pe st
+let pf_last_asgn    pe st = pf_last_gen  "asgn"    destr_asgn    pe st
+let pf_last_secasgn pe st = pf_last_gen  "secasgn" destr_secasgn pe st
+let pf_last_rnd     pe st = pf_last_gen  "rnd"     destr_rnd     pe st
+let pf_last_call    pe st = pf_last_gen  "call"    destr_call    pe st
+let pf_last_if      pe st = pf_last_gen  "if"      destr_if      pe st
+let pf_last_while   pe st = pf_last_gen  "while"   destr_while   pe st
+let pf_last_assert  pe st = pf_last_gen  "assert"  destr_assert  pe st
 
 (* -------------------------------------------------------------------- *)
-let tc1_first_asgn   tc st = pf_first_asgn   !!tc st
-let tc1_first_rnd    tc st = pf_first_rnd    !!tc st
-let tc1_first_call   tc st = pf_first_call   !!tc st
-let tc1_first_if     tc st = pf_first_if     !!tc st
-let tc1_first_while  tc st = pf_first_while  !!tc st
-let tc1_first_assert tc st = pf_first_assert !!tc st
+let tc1_first_asgn    tc st = pf_first_asgn    !!tc st
+let tc1_first_secasgn tc st = pf_first_secasgn !!tc st
+let tc1_first_rnd     tc st = pf_first_rnd     !!tc st
+let tc1_first_call    tc st = pf_first_call    !!tc st
+let tc1_first_if      tc st = pf_first_if      !!tc st
+let tc1_first_while   tc st = pf_first_while   !!tc st
+let tc1_first_assert  tc st = pf_first_assert  !!tc st
 
 (* -------------------------------------------------------------------- *)
-let tc1_last_asgn   tc st = pf_last_asgn   !!tc st
-let tc1_last_rnd    tc st = pf_last_rnd    !!tc st
-let tc1_last_call   tc st = pf_last_call   !!tc st
-let tc1_last_if     tc st = pf_last_if     !!tc st
-let tc1_last_while  tc st = pf_last_while  !!tc st
-let tc1_last_assert tc st = pf_last_assert !!tc st
+let tc1_last_asgn    tc st = pf_last_asgn    !!tc st
+let tc1_last_secasgn tc st = pf_last_secasgn !!tc st
+let tc1_last_rnd     tc st = pf_last_rnd     !!tc st
+let tc1_last_call    tc st = pf_last_call    !!tc st
+let tc1_last_if      tc st = pf_last_if      !!tc st
+let tc1_last_while   tc st = pf_last_while   !!tc st
+let tc1_last_assert  tc st = pf_last_assert  !!tc st
 
 (* -------------------------------------------------------------------- *)
 (* TODO: use in change pos *)
@@ -132,20 +136,22 @@ let pf_pos_last_gen msg test pe s =
   | None -> tc_error pe "can not find the last %s instruction" msg
   | Some i -> i
 
-let pf_pos_last_asgn   pe s = pf_pos_last_gen "asgn"   is_asgn   pe s
-let pf_pos_last_rnd    pe s = pf_pos_last_gen "rnd"    is_rnd    pe s
-let pf_pos_last_call   pe s = pf_pos_last_gen "call"   is_call   pe s
-let pf_pos_last_if     pe s = pf_pos_last_gen "if"     is_if     pe s
-let pf_pos_last_while  pe s = pf_pos_last_gen "while"  is_while  pe s
-let pf_pos_last_assert pe s = pf_pos_last_gen "assert" is_assert pe s
+let pf_pos_last_asgn    pe s = pf_pos_last_gen "asgn"    is_asgn    pe s
+let pf_pos_last_secasgn pe s = pf_pos_last_gen "secasgn" is_secasgn pe s
+let pf_pos_last_rnd     pe s = pf_pos_last_gen "rnd"     is_rnd     pe s
+let pf_pos_last_call    pe s = pf_pos_last_gen "call"    is_call    pe s
+let pf_pos_last_if      pe s = pf_pos_last_gen "if"      is_if      pe s
+let pf_pos_last_while   pe s = pf_pos_last_gen "while"   is_while   pe s
+let pf_pos_last_assert  pe s = pf_pos_last_gen "assert"  is_assert  pe s
 
 
-let tc1_pos_last_asgn   tc s = pf_pos_last_asgn   !!tc s
-let tc1_pos_last_rnd    tc s = pf_pos_last_rnd    !!tc s
-let tc1_pos_last_call   tc s = pf_pos_last_call   !!tc s
-let tc1_pos_last_if     tc s = pf_pos_last_if     !!tc s
-let tc1_pos_last_while  tc s = pf_pos_last_while  !!tc s
-let tc1_pos_last_assert tc s = pf_pos_last_assert !!tc s
+let tc1_pos_last_asgn    tc s = pf_pos_last_asgn    !!tc s
+let tc1_pos_last_secasgn tc s = pf_pos_last_secasgn !!tc s
+let tc1_pos_last_rnd     tc s = pf_pos_last_rnd     !!tc s
+let tc1_pos_last_call    tc s = pf_pos_last_call    !!tc s
+let tc1_pos_last_if      tc s = pf_pos_last_if      !!tc s
+let tc1_pos_last_while   tc s = pf_pos_last_while   !!tc s
+let tc1_pos_last_assert  tc s = pf_pos_last_assert  !!tc s
 
 (* -------------------------------------------------------------------- *)
 let pf_as_hoareF   pe c = as_phl (`Hoare  `Pred) (fun () -> destr_hoareF   c) pe

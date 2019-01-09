@@ -124,6 +124,20 @@ module CI_Distr = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module CI_Leakable = struct
+  let i_Leakable = "Leakable"
+  let p_Leakable = EcPath.pqname p_top i_Leakable
+  let _Leakable  = fun x -> EcPath.pqname p_Leakable x
+  let p_leakable = _Leakable "leakable"
+
+  let p_is_leaked = _Leakable "is_leaked"
+  let p_inst = _Leakable "inst"
+
+  let p_min_leakage = _Leakable "MIN_LEAKAGE"
+  let p_secret      = _Leakable "SECRET"
+end
+
+(* -------------------------------------------------------------------- *)
 module CI_Map = struct
   let i_Map = "CoreMap"
   let p_Map = EcPath.pqname p_top i_Map

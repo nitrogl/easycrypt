@@ -403,6 +403,7 @@
 %token CUT
 %token DEBUG
 %token DECLARE
+%token DECLASSIFY
 %token DELTA
 %token DLBRACKET
 %token DO
@@ -464,6 +465,8 @@
 %token LEFT
 %token LEMMA
 %token LESAMPLE
+%token LESECASGN
+%token LESECSAMP
 %token LET
 %token LLARROW
 %token LOCAL
@@ -523,6 +526,8 @@
 %token RWNORMAL
 %token SAMPLE
 %token SEARCH
+%token SECASGN
+%token SECSAMPLE
 %token SECTION
 %token SELF
 %token SEMICOLON
@@ -1288,6 +1293,14 @@ base_instr:
 | x=lvalue LESAMPLE  e=expr
     { PSrnd (x, e) }
 
+| x=lvalue EQ SECSAMPLE e=expr
+| x=lvalue LESECSAMP  e=expr
+    { PSsecrnd (x, e) }
+
+| x=lvalue EQ SECASGN e=expr
+| x=lvalue LESECASGN  e=expr
+    { PSsecasgn (x, e) }
+
 | x=lvalue EQ     e=expr
 | x=lvalue LARROW e=expr
     { PSasgn (x, e) }
@@ -1878,6 +1891,10 @@ im_stmt_atomic:
 | UNDERSCORE LARROW UNDERSCORE
    { IM_Assign }
 
+| LESECASGN
+| UNDERSCORE LESECASGN UNDERSCORE
+   { IM_SecureAssign }
+
 | LESAMPLE
 | UNDERSCORE LESAMPLE UNDERSCORE
    { IM_Sample }
@@ -2316,11 +2333,12 @@ tac_dir:
 | empty { Backs }
 
 icodepos_r:
-| IF       { (`If     :> cp_match) }
-| WHILE    { (`While  :> cp_match) }
-| LARROW   { (`Assign :> cp_match) }
-| LESAMPLE { (`Sample :> cp_match) }
-| LEAT     { (`Call   :> cp_match) }
+| IF        { (`If      :> cp_match) }
+| WHILE     { (`While   :> cp_match) }
+| LARROW    { (`Assign  :> cp_match) }
+| LESAMPLE  { (`Sample  :> cp_match) }
+| LESECASGN { (`SecAsgn :> cp_match) }
+| LEAT      { (`Call    :> cp_match) }
 
 %inline icodepos:
  | HAT x=icodepos_r { x }
@@ -2693,6 +2711,9 @@ phltactic:
 
 | CFOLD s=side? c=codepos
     { Pcfold (s, c, None) }
+
+| DECLASSIFY s=side?
+    { Pdeclassify (s) }
 
 | RND s=side? info=rnd_info
     { Prnd (s, info) }

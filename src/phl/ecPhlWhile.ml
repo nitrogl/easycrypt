@@ -25,7 +25,7 @@ module Mid = EcIdent.Mid
 let while_info env e s =
   let rec i_info (w,r,c) i =
     match i.i_node with
-    | Sasgn(lp, e) | Srnd(lp, e) ->
+    | Sasgn(lp, e) | Ssecasgn(lp, e) | Srnd(lp, e) | Ssecrnd(lp, e)  ->
         let r = e_read_r env (EcPV.lp_read_r env r lp) e in
         let w = lp_write_r env w lp in
         (w, r, c)

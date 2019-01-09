@@ -196,11 +196,12 @@ val can_concretize : mevmap -> EcUnify.unienv -> bool
 type regexp_instr = regexp1_instr gen_regexp
 
 and regexp1_instr =
-  | RAssign
-  | RSample
-  | RCall
-  | RIf        of regexp_instr * regexp_instr
-  | RWhile     of regexp_instr
+  | RAssign          (*of lvalue * expr*)
+  | RSecureAssign    (*of lvalue * expr*)
+  | RSample          (*of lvalue * expr*)
+  | RCall            (*of lvalue option * EcPath.xpath * expr list*)
+  | RIf              of (*expr *) regexp_instr * regexp_instr
+  | RWhile           of (*expr *) regexp_instr
 
 module RegexpStmt : sig
   type regexp  = regexp_instr

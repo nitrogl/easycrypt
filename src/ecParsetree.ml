@@ -104,13 +104,15 @@ type plvalue_r =
 and plvalue = plvalue_r located
 
 type pinstr_r =
-  | PSident  of psymbol
-  | PSasgn   of plvalue * pexpr
-  | PSrnd    of plvalue * pexpr
-  | PScall   of plvalue option * pgamepath * (pexpr list) located
-  | PSif     of pscond * pscond list * pstmt
-  | PSwhile  of pscond
-  | PSassert of pexpr
+  | PSident   of psymbol
+  | PSasgn    of plvalue * pexpr
+  | PSsecasgn of plvalue * pexpr
+  | PSrnd     of plvalue * pexpr
+  | PSsecrnd  of plvalue * pexpr
+  | PScall    of plvalue option * pgamepath * (pexpr list) located
+  | PSif      of pscond * pscond list * pstmt
+  | PSwhile   of pscond
+  | PSassert  of pexpr
 
 and pscond = pexpr * pstmt
 and pinstr = pinstr_r located
@@ -398,7 +400,7 @@ type preduction = {
 }
 
 (* -------------------------------------------------------------------- *)
-type cp_match = [ `If | `While | `Assign | `Sample | `Call ]
+type cp_match = [ `If | `While | `Assign | `SecAsgn | `SecSample | `Sample | `Call ]
 type cp_base  = [ `ByPos of int | `ByMatch of int option * cp_match ]
 
 type codepos1 = int * cp_base
@@ -459,6 +461,7 @@ type pim_regexp =
   | IM_Any
   | IM_Parens of pim_regexp
   | IM_Assign
+  | IM_SecureAssign
   | IM_Sample
   | IM_Call
   | IM_If     of pim_block option * pim_block option
@@ -568,6 +571,7 @@ type phltactic =
   | Psp            of codepos1 doption option
   | Pwhile         of (oside * while_info)
   | Pasyncwhile    of async_while_info
+  | Pdeclassify    of oside
   | Pfission       of (oside * codepos * (int * (int * int)))
   | Pfusion        of (oside * codepos * (int * (int * int)))
   | Punroll        of (oside * codepos * bool)

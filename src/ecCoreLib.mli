@@ -129,6 +129,19 @@ module CI_Distr : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module CI_Leakable : sig
+  val i_Leakable : symbol
+  val p_Leakable : path
+  val p_leakable : path
+
+  val p_is_leaked : path
+  val p_inst      : path
+
+  val p_min_leakage : path
+  val p_secret      : path
+end
+
+(* -------------------------------------------------------------------- *)
 module CI_Map : sig
   val i_Map  : symbol
   val p_Map  : path

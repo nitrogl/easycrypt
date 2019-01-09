@@ -204,12 +204,7 @@ let (_i_inuse, s_inuse, se_inuse) =
 
   and i_inuse (map : uses) (i : instr) =
     match i.i_node with
-    | Sasgn (lv, e) ->
-      let map = lv_inuse map lv in
-      let map = se_inuse map e in
-        map
-
-    | Srnd (lv, e) ->
+    | Sasgn (lv, e) | Ssecasgn (lv, e) | Srnd (lv, e) | Ssecrnd (lv, e) ->
       let map = lv_inuse map lv in
       let map = se_inuse map e in
         map
@@ -1907,6 +1902,24 @@ and transinstr
           unify_or_fail env ue prvalue.pl_loc ~expct:lty rty;
           [ i_asgn (lvalue, rvalue) ]
     end
+
+  | PSsecasgn (plvalue, prvalue) ->
+      let lvalue, lty = translvalue ue env plvalue in
+      let rvalue, rty = transexp env `InProc ue prvalue in
+      unify_or_fail env ue prvalue.pl_loc ~expct:(tleakable lty) rty;
+      [ i_secasgn (lvalue, rvalue) ]
+
+  | PSsecrnd (plvalue, prvalue) ->
+      let lvalue, lty = translvalue ue env plvalue in
+      let rvalue, rty = transexp env `InProc ue prvalue in begin
+        match as_tdistr (EcEnv.Ty.hnorm rty env) with
+        | Some sty ->
+          unify_or_fail env ue prvalue.pl_loc ~expct:(tdistr sty) rty; (* This is obvious by deconstruction *)
+          unify_or_fail env ue prvalue.pl_loc ~expct:(tleakable sty) lty;
+          [ i_secrnd (lvalue, rvalue) ]
+        | _ ->
+          tyerror plvalue.pl_loc env TypeClassMismatch
+      end
 
   | PSrnd (plvalue, prvalue) ->
       let lvalue, lty = translvalue ue env plvalue in

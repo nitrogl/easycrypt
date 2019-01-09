@@ -125,12 +125,13 @@ let tfun t1 t2   = mk_ty (Tfun (t1, t2))
 let tglob m      = mk_ty (Tglob m)
 
 (* -------------------------------------------------------------------- *)
-let tunit      = tconstr EcCoreLib.CI_Unit .p_unit  []
-let tbool      = tconstr EcCoreLib.CI_Bool .p_bool  []
-let tint       = tconstr EcCoreLib.CI_Int  .p_int   []
-let tdistr ty  = tconstr EcCoreLib.CI_Distr.p_distr [ty]
-let treal      = tconstr EcCoreLib.CI_Real .p_real  []
-let tcpred ty  = tfun ty tbool
+let tunit        = tconstr EcCoreLib.CI_Unit    .p_unit     []
+let tbool        = tconstr EcCoreLib.CI_Bool    .p_bool     []
+let tint         = tconstr EcCoreLib.CI_Int     .p_int      []
+let tdistr ty    = tconstr EcCoreLib.CI_Distr   .p_distr    [ty]
+let tleakable ty = tconstr EcCoreLib.CI_Leakable.p_leakable [ty]
+let treal        = tconstr EcCoreLib.CI_Real    .p_real     []
+let tcpred ty    = tfun ty tbool
 
 let ttuple lt    =
   match lt with
@@ -164,6 +165,20 @@ let as_tdistr (ty : ty) =
   | _ -> None
 
 let is_tdistr (ty : ty) = as_tdistr ty <> None
+
+(* -------------------------------------------------------------------- *)
+let as_tleakable (ty : ty) =
+  match ty.ty_node with
+  | Tconstr (p, [sty])
+      when EcPath.p_equal p EcCoreLib.CI_Leakable.p_leakable
+    -> Some sty
+  | Ttuple (lty)
+      when List.length lty = 2 && List.nth lty 1 = tbool
+    -> Some (List.nth lty 0)
+
+  | _ -> None
+
+let is_tleakable (ty : ty) = as_tleakable ty <> None
 
 (* -------------------------------------------------------------------- *)
 module TySmart = struct

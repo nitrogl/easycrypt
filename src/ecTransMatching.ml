@@ -62,11 +62,12 @@ let rec trans_block (anchors, pattern_parsed) =
 
 (*-------------------------------------------------------------------- *)
 and trans_stmt = function
-  | IM_Any      -> any_stmt
-  | IM_Parens r -> trans_stmt r
-  | IM_Assign   -> Base RAssign
-  | IM_Sample   -> Base RSample
-  | IM_Call     -> Base RCall
+  | IM_Any          -> any_stmt
+  | IM_Parens r     -> trans_stmt r
+  | IM_Assign       -> Base RAssign
+  | IM_SecureAssign -> Base RSecureAssign
+  | IM_Sample       -> Base RSample
+  | IM_Call         -> Base RCall
 
   | IM_If (bt, bf)  ->
      let branch_true  = trans_block (odfl any_block bt) in

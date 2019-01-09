@@ -764,6 +764,11 @@ let pp_proji ppe pp_sub osc fmt (e,i) =
     (pp_sub ppe (osc, (max_op_prec, `NonAssoc))) e
     (i+1)
 
+let pp_leak ppe pp_sub osc fmt (e,b) =
+  Format.fprintf fmt "{%a/%s}"
+    (pp_sub ppe (osc, (max_op_prec, `NonAssoc))) e
+    (if b then "leaked" else "secret")
+
 (* -------------------------------------------------------------------- *)
 let pp_let ?fv (ppe : PPEnv.t) pp_sub outer fmt (pt, e1, e2) =
   let pp fmt (pt, e1, e2) =
@@ -1242,11 +1247,13 @@ let string_of_cpos1 ((off, cp) : EcParsetree.codepos1) =
         let s =
           let k =
             match k with
-            | `If     -> "if"
-            | `While  -> "while"
-            | `Assign -> "<-"
-            | `Sample -> "<$"
-            | `Call   -> "<@"
+            | `If        -> "if"
+            | `While     -> "while"
+            | `Assign    -> "<-"
+            | `SecAsgn   -> "</"
+            | `Sample    -> "<$"
+            | `SecSample -> "</$"
+            | `Call      -> "<@"
           in Printf.sprintf "^%s" k in
 
         match i with
@@ -1278,9 +1285,17 @@ and pp_instr_for_form (ppe : PPEnv.t) fmt i =
   | Sasgn (lv, e) ->
       Format.fprintf fmt "%a <-@;<1 2>%a"
         (pp_lvalue ppe) lv (pp_expr ppe) e
+        
+  | Ssecasgn (lv, e) ->
+      Format.fprintf fmt "%a </@;<1 2>%a"
+        (pp_lvalue ppe) lv (pp_expr ppe) e
 
   | Srnd (lv, e) ->
       Format.fprintf fmt "%a <$@;<1 2>$%a"
+        (pp_lvalue ppe) lv (pp_expr ppe) e
+
+  | Ssecrnd (lv, e) ->
+      Format.fprintf fmt "%a </$@;<1 2>$%a"
         (pp_lvalue ppe) lv (pp_expr ppe) e
 
   | Scall (None, xp, args) ->
@@ -2009,14 +2024,16 @@ let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
 
 (* -------------------------------------------------------------------- *)
 type ppnode1 = [
-  | `Asgn   of (EcModules.lvalue * EcTypes.expr)
-  | `Assert of (EcTypes.expr)
-  | `Call   of (EcModules.lvalue option * P.xpath * EcTypes.expr list)
-  | `Rnd    of (EcModules.lvalue * EcTypes.expr)
+  | `Asgn     of (EcModules.lvalue * EcTypes.expr)
+  | `SecAsgn  of (EcModules.lvalue * EcTypes.expr)
+  | `Assert   of (EcTypes.expr)
+  | `Call     of (EcModules.lvalue option * P.xpath * EcTypes.expr list)
+  | `Rnd      of (EcModules.lvalue * EcTypes.expr)
+  | `SecRnd   of (EcModules.lvalue * EcTypes.expr)
   | `Abstract of EcIdent.t
-  | `If     of (EcTypes.expr)
+  | `If       of (EcTypes.expr)
   | `Else
-  | `While  of (EcTypes.expr)
+  | `While    of (EcTypes.expr)
   | `None
   | `EBlk
 ]
@@ -2029,7 +2046,9 @@ type cppnode  = cppnode1 * cppnode1 * char * cppnode list list
 let at n i =
   match i, n with
   | Sasgn (lv, e)    , 0 -> Some (`Asgn (lv, e)    , `P, [])
+  | Ssecasgn (lv, e) , 0 -> Some (`SecAsgn (lv, e) , `P, [])
   | Srnd  (lv, e)    , 0 -> Some (`Rnd  (lv, e)    , `P, [])
+  | Ssecrnd (lv, e)  , 0 -> Some (`SecRnd  (lv, e) , `P, [])
   | Scall (lv, f, es), 0 -> Some (`Call (lv, f, es), `P, [])
   | Sassert e        , 0 -> Some (`Assert e        , `P, [])
   | Sabstract id     , 0 -> Some (`Abstract id     , `P, [])
@@ -2104,6 +2123,10 @@ let pp_i_asgn (ppe : PPEnv.t) fmt (lv, e) =
   Format.fprintf fmt "%a <-@ %a"
     (pp_lvalue ppe) lv (pp_expr ppe) e
 
+let pp_i_secasgn (ppe : PPEnv.t) fmt (lv, e) =
+  Format.fprintf fmt "%a </@ %a"
+    (pp_lvalue ppe) lv (pp_expr ppe) e
+
 let pp_i_assert (ppe : PPEnv.t) fmt e =
   Format.fprintf fmt "assert (%a)" (pp_expr ppe) e
 
@@ -2124,6 +2147,10 @@ let pp_i_rnd (ppe : PPEnv.t) fmt (lv, e) =
   Format.fprintf fmt "%a <$@ @[<hov 2>%a@]"
     (pp_lvalue ppe) lv (pp_expr ppe) e
 
+let pp_i_secrnd (ppe : PPEnv.t) fmt (lv, e) =
+  Format.fprintf fmt "%a </$@ %a"
+    (pp_lvalue ppe) lv (pp_expr ppe) e
+
 let pp_i_if (ppe : PPEnv.t) fmt e =
   Format.fprintf fmt "if (%a) {" (pp_expr ppe) e
 
@@ -2141,16 +2168,18 @@ let pp_i_abstract (_ppe : PPEnv.t) fmt id =
 (* -------------------------------------------------------------------- *)
 let c_ppnode1 ~width ppe (pp1 : ppnode1) =
   match pp1 with
-  | `Asgn   x -> c_split ~width (pp_i_asgn   ppe) x
-  | `Assert x -> c_split ~width (pp_i_assert ppe) x
-  | `Call   x -> c_split ~width (pp_i_call   ppe) x
-  | `Rnd    x -> c_split ~width (pp_i_rnd    ppe) x
+  | `Asgn     x -> c_split ~width (pp_i_asgn     ppe) x
+  | `SecAsgn  x -> c_split ~width (pp_i_secasgn  ppe) x
+  | `Assert   x -> c_split ~width (pp_i_assert   ppe) x
+  | `Call     x -> c_split ~width (pp_i_call     ppe) x
+  | `Rnd      x -> c_split ~width (pp_i_rnd      ppe) x
+  | `SecRnd   x -> c_split ~width (pp_i_secrnd   ppe) x
   | `Abstract x -> c_split ~width (pp_i_abstract ppe) x
-  | `If     x -> c_split ~width (pp_i_if     ppe) x
-  | `Else     -> c_split ~width (pp_i_else   ppe) ()
-  | `While  x -> c_split ~width (pp_i_while  ppe) x
-  | `EBlk     -> c_split ~width (pp_i_blk    ppe) ()
-  | `None     -> []
+  | `If       x -> c_split ~width (pp_i_if       ppe) x
+  | `Else       -> c_split ~width (pp_i_else     ppe) ()
+  | `While    x -> c_split ~width (pp_i_while    ppe) x
+  | `EBlk       -> c_split ~width (pp_i_blk      ppe) ()
+  | `None       -> []
 
 let rec c_ppnode ~width ?mem ppe (pps : ppnode list list) =
   let do1 ((p1, p2, c, subs) : ppnode) : cppnode =
@@ -2606,8 +2635,16 @@ let rec pp_instr_r (ppe : PPEnv.t) fmt i =
     Format.fprintf fmt "@[<hov 2>%a <-@ @[%a@]@];"
       (pp_lvalue ppe) lv (pp_expr ppe) e
 
+  | Ssecasgn (lv, e) ->
+    Format.fprintf fmt "@[<hov 2>%a </@ @[%a@]@];"
+      (pp_lvalue ppe) lv (pp_expr ppe) e
+
   | Srnd (lv, e) ->
     Format.fprintf fmt "@[<hov 2>%a <$@ @[%a@];"
+      (pp_lvalue ppe) lv (pp_expr ppe) e
+
+  | Ssecrnd (lv, e) ->
+    Format.fprintf fmt "@[<hov 2>%a </$@ @[%a@];"
       (pp_lvalue ppe) lv (pp_expr ppe) e
 
   | Scall (None, xp, args) ->

@@ -49,13 +49,15 @@ module LowSubst = struct
     let ssubst = ssubst m in
 
     match i.i_node with
-    | Sasgn  (lv, e)     -> i_asgn   (lvsubst m lv, esubst e)
-    | Srnd   (lv, e)     -> i_rnd    (lvsubst m lv, esubst e)
-    | Scall  (lv, f, es) -> i_call   (lv |> omap (lvsubst m), f, List.map esubst es)
-    | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
-    | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
-    | Sassert e          -> i_assert (esubst e)
-    | Sabstract _        -> i
+    | Sasgn     (lv, e)     -> i_asgn    (lvsubst m lv, esubst e)
+    | Ssecasgn  (lv, e)     -> i_secasgn (lvsubst m lv, esubst e)
+    | Srnd      (lv, e)     -> i_rnd     (lvsubst m lv, esubst e)
+    | Ssecrnd   (lv, e)     -> i_secrnd  (lvsubst m lv, esubst e)
+    | Scall     (lv, f, es) -> i_call    (lv |> omap (lvsubst m), f, List.map esubst es)
+    | Sif       (c, s1, s2) -> i_if      (esubst c, ssubst s1, ssubst s2)
+    | Swhile    (e, stmt)   -> i_while   (esubst e, ssubst stmt)
+    | Sassert   e           -> i_assert  (esubst e)
+    | Sabstract _           -> i
 
   and issubst m (is : instr list) =
     List.map (isubst m) is

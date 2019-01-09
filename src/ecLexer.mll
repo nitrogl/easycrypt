@@ -147,6 +147,7 @@
     "byphoare"    , BYPHOARE   ;        (* KW: tactic *)
     "byequiv"     , BYEQUIV    ;        (* KW: tactic *)
     "fel"         , FEL        ;        (* KW: tactic *)
+    "declassify"  , DECLASSIFY ;        (* KW: tactic *)
 
     "conseq"      , CONSEQ     ;        (* KW: tactic *)
     "exfalso"     , EXFALSO    ;        (* KW: tactic *)
@@ -386,6 +387,8 @@ rule main = parse
   | "|}"  { [RPBRACE   ] }
   | "`|"  { [TICKPIPE  ] }
   | "<$"  { [LESAMPLE  ] }
+  | "</"  { [LESECASGN ] }
+  | "</$" { [LESECSAMP ] }
   | "<@"  { [LEAT      ] }
   | ":~"  { [COLONTILD ] }
 

@@ -109,7 +109,7 @@ and callable_oracles_i env modv os i =
     | Swhile (_, s)      -> callable_oracles_s  env modv os s
     | Sif    (_, s1, s2) -> callable_oracles_sx env modv os [s1; s2]
 
-    | Sasgn _ | Srnd _ | Sassert _ -> os
+    | Sasgn _ | Ssecasgn _ | Srnd _ | Ssecrnd _ | Sassert _ -> os
 
     | Sabstract _ -> assert false (* FIXME *)
 
