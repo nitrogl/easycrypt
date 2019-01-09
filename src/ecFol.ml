@@ -140,19 +140,6 @@ let f_lossless ty d =
   f_app (fop_lossless ty) [d] tbool
 
 (* -------------------------------------------------------------------- *)
-let fop_is_leaked ty =
-  f_op CI.CI_Leakable.p_is_leaked  [ty] (toarrow [tleakable ty] tbool)
-let fop_inst      ty =
-  f_op CI.CI_Leakable.p_inst       [ty] (toarrow [tleakable ty] ty)
-
-let proj_leakable_ty = proj_constr_ty
-
-let f_is_leaked ty l =
-  f_app (fop_is_leaked ty) [l] tbool
-let f_inst ty l =
-  f_app (fop_inst ty) [l] ty
-
-(* -------------------------------------------------------------------- *)
 let f_losslessF f = f_bdHoareF f_true f f_true FHeq f_r1
 
 (* -------------------------------------------------------------------- *)
