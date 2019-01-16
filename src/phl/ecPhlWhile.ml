@@ -563,7 +563,8 @@ let process_async_while (winfos : EP.async_while_info) tc =
         let test, m = ASyncWhile.form_of_expr env ml test in
         let c       = s_while (test, cl) in
         xhyps m
-          (f_bdHoareS (mhr, EcMemory.memtype evs.es_ml) inv c f_true FHeq f_r1)
+          (f_forall_mems [evs.es_mr]
+          (f_bdHoareS (mhr, EcMemory.memtype evs.es_ml) inv c f_true FHeq f_r1))
 
       and ll2 =
         let subst   = Fsubst.f_bind_mem Fsubst.f_subst_id mr mhr in
@@ -572,7 +573,8 @@ let process_async_while (winfos : EP.async_while_info) tc =
         let test, m = ASyncWhile.form_of_expr env mr test in
         let c       = s_while (test, cr) in
         xhyps m
-          (f_bdHoareS (mhr, EcMemory.memtype evs.es_mr) inv c f_true FHeq f_r1)
+          (f_forall_mems [evs.es_mr]
+          (f_bdHoareS (mhr, EcMemory.memtype evs.es_mr) inv c f_true FHeq f_r1))
 
       in (ll1, ll2)
 
