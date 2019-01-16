@@ -387,8 +387,8 @@ let process_while side winfos tc =
 module ASyncWhile = struct
   exception CannotTranslate
 
-  let form_of_expr env mh =
-    let map = ref Mid.empty in
+  let form_of_expr env mother mh =
+    let bds = ref (EcPV.PVMap.create env) in
 
     let rec aux fp =
       match fp.f_node with
@@ -415,20 +415,18 @@ module ASyncWhile = struct
       | Fpvar (pv, m) ->
          if EcIdent.id_equal m mh then
            e_var pv fp.f_ty
-         else
-           let bds = odfl (EcPV.PVMap.create env) (Mid.find_opt m !map) in
+         else if EcIdent.id_equal m mother then
            let idx =
-             match EcPV.PVMap.find pv bds with
+             match EcPV.PVMap.find pv !bds with
              | None ->
                  let pfx = EcIdent.name m in
                  let pfx = String.sub pfx  1 (String.length pfx - 1) in
                  let x   = EcPath.basename pv.pv_name.EcPath.x_sub in
                  let x   = EcIdent.create (x ^ "_" ^ pfx) in
-                 let bds = EcPV.PVMap.add pv (x, fp.f_ty) bds in
-                 map := Mid.add m bds !map; x
+                 bds := EcPV.PVMap.add pv (x, fp.f_ty) !bds; x
              | Some (x, _) -> x
-
            in e_local idx fp.f_ty
+         else raise CannotTranslate
 
       | Fglob     _
       | FhoareF   _ | FhoareS   _
@@ -447,7 +445,7 @@ module ASyncWhile = struct
       | GTty ty -> (x, ty)
       | _ -> raise CannotTranslate
 
-    in fun f -> let e = aux f in (e, !map)
+    in fun f -> let e = aux f in (e, !bds)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -534,25 +532,13 @@ let process_async_while (winfos : EP.async_while_info) tc =
     in (hr1, hr2)
   in
 
-  let xhyps =
-    let mtypes = Mid.of_list [evs.es_ml; evs.es_mr] in
-
-    fun m fp ->
-      let fp =
-        Mid.fold (fun mh pvs fp ->
-          let mty = Mid.find_opt mh mtypes in
-          let fp  =
-            EcPV.Mnpv.fold (fun pv (x, ty) fp ->
-              f_let1 x (f_pvar pv ty mh) fp)
-            (EcPV.PVMap.raw pvs) fp
-          in f_forall_mems [mh, oget mty] fp)
-        m fp
-      and cnt =
-        Mid.fold
-          (fun _ pvs i -> i + 1 + EcPV.Mnpv.cardinal (EcPV.PVMap.raw pvs))
-          m 0
-      in (cnt, fp)
-  in
+  let xhyps m bds fp =
+    let fp  =
+      EcPV.Mnpv.fold
+        (fun pv (x, ty) fp -> f_let1 x (f_pvar pv ty (EcMemory.memory m)) fp)
+        (EcPV.PVMap.raw bds) fp
+    and cnt = 1 + EcPV.Mnpv.cardinal (EcPV.PVMap.raw bds) in
+  (cnt, f_forall_mems [m] fp) in
 
   let (c1, ll1), (c2, ll2) =
     try
@@ -560,18 +546,18 @@ let process_async_while (winfos : EP.async_while_info) tc =
         let subst   = Fsubst.f_bind_mem Fsubst.f_subst_id ml mhr in
         let inv     = Fsubst.f_subst subst inv in
         let test    = f_ands [fe1; f_not p0; p1] in
-        let test, m = ASyncWhile.form_of_expr env ml test in
+        let test, m = ASyncWhile.form_of_expr env mr ml test in
         let c       = s_while (test, cl) in
-        xhyps m
+        xhyps evs.es_mr m
           (f_bdHoareS (mhr, EcMemory.memtype evs.es_ml) inv c f_true FHeq f_r1)
 
       and ll2 =
         let subst   = Fsubst.f_bind_mem Fsubst.f_subst_id mr mhr in
         let inv     = Fsubst.f_subst subst inv in
         let test    = f_ands [fe1; f_not p0; f_not p1] in
-        let test, m = ASyncWhile.form_of_expr env mr test in
+        let test, m = ASyncWhile.form_of_expr env ml mr test in
         let c       = s_while (test, cr) in
-        xhyps m
+        xhyps evs.es_ml m
           (f_bdHoareS (mhr, EcMemory.memtype evs.es_mr) inv c f_true FHeq f_r1)
 
       in (ll1, ll2)
