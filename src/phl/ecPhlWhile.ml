@@ -577,7 +577,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
         let test, m = ASyncWhile.form_of_expr env mr test in
         let c       = s_while (test, cr) in
         xhyps m
-          (f_forall_mems [evs.es_mr]
+          (f_forall_mems [evs.es_ml]
           (f_bdHoareS (mhr, EcMemory.memtype evs.es_mr) inv c f_true FHeq f_r1))
 
       in (ll1, ll2)
