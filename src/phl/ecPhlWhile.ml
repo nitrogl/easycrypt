@@ -33,14 +33,10 @@ let while_info env e s =
     | Sif (e, s1, s2) ->
         let r = e_read_r env r e in s_info (s_info (w, r, c) s1) s2
 
-    | Swhile (e, s) ->
+    | Swhile(e,s) ->
         let r = e_read_r env r e in s_info (w, r, c) s
 
-    | Smatch (e, bs) ->
-        let r = e_read_r env r e in
-        List.fold_left (fun st (_, b) -> s_info st b) (w, r, c) bs
-
-    | Scall (lp, f, es) ->
+    | Scall(lp,f,es) ->
         let r = List.fold_left (e_read_r env) r es in
         let r = match lp with None -> r | Some lp -> lp_read_r  env r lp in
         let w = match lp with None -> w | Some lp -> lp_write_r env w lp in
@@ -51,12 +47,12 @@ let while_info env e s =
         (w, e_read_r env r e, c)
 
     | Sabstract id ->
-        let add_pv x (pv,ty) = PV.add env pv ty x in
-        let us = EcEnv.AbsStmt.byid id env in
-        let w = List.fold_left add_pv w us.EcModules.aus_writes in
-        let r = List.fold_left add_pv r us.EcModules.aus_reads in
-        let c = List.fold_left (fun c f -> Sx.add f c) c us.EcModules.aus_calls in
-        (w, r, c)
+      let add_pv x (pv,ty) = PV.add env pv ty x in
+      let us = EcEnv.AbsStmt.byid id env in
+      let w = List.fold_left add_pv w us.EcModules.aus_writes in
+      let r = List.fold_left add_pv r us.EcModules.aus_reads in
+      let c = List.fold_left (fun c f -> Sx.add f c) c us.EcModules.aus_calls in
+      (w, r, c)
 
   and s_info info s = List.fold_left i_info info s.s_node in
 
@@ -419,18 +415,20 @@ module ASyncWhile = struct
       | Fpvar (pv, m) ->
          if EcIdent.id_equal m mh then
            e_var pv fp.f_ty
-         else if EcIdent.id_equal m mother then
+         else
+           let bds = odfl (EcPV.PVMap.create env) (Mid.find_opt m !map) in
            let idx =
-             match EcPV.PVMap.find pv !bds with
+             match EcPV.PVMap.find pv bds with
              | None ->
                  let pfx = EcIdent.name m in
                  let pfx = String.sub pfx  1 (String.length pfx - 1) in
                  let x   = EcPath.basename pv.pv_name.EcPath.x_sub in
                  let x   = EcIdent.create (x ^ "_" ^ pfx) in
-                 bds := EcPV.PVMap.add pv (x, fp.f_ty) !bds; x
+                 let bds = EcPV.PVMap.add pv (x, fp.f_ty) bds in
+                 map := Mid.add m bds !map; x
              | Some (x, _) -> x
+
            in e_local idx fp.f_ty
-         else raise CannotTranslate
 
       | Fglob     _
       | FhoareF   _ | FhoareS   _
@@ -449,7 +447,7 @@ module ASyncWhile = struct
       | GTty ty -> (x, ty)
       | _ -> raise CannotTranslate
 
-    in fun f -> let e = aux f in (e, !bds)
+    in fun f -> let e = aux f in (e, !map)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -536,13 +534,25 @@ let process_async_while (winfos : EP.async_while_info) tc =
     in (hr1, hr2)
   in
 
-  let xhyps m bds fp =
-    let fp  =
-      EcPV.Mnpv.fold
-        (fun pv (x, ty) fp -> f_let1 x (f_pvar pv ty (EcMemory.memory m)) fp)
-        (EcPV.PVMap.raw bds) fp
-    and cnt = 1 + EcPV.Mnpv.cardinal (EcPV.PVMap.raw bds) in
-  (cnt, f_forall_mems [m] fp) in
+  let xhyps =
+    let mtypes = Mid.of_list [evs.es_ml; evs.es_mr] in
+
+    fun m fp ->
+      let fp =
+        Mid.fold (fun mh pvs fp ->
+          let mty = Mid.find_opt mh mtypes in
+          let fp  =
+            EcPV.Mnpv.fold (fun pv (x, ty) fp ->
+              f_let1 x (f_pvar pv ty mh) fp)
+            (EcPV.PVMap.raw pvs) fp
+          in f_forall_mems [mh, oget mty] fp)
+        m fp
+      and cnt =
+        Mid.fold
+          (fun _ pvs i -> i + 1 + EcPV.Mnpv.cardinal (EcPV.PVMap.raw pvs))
+          m 0
+      in (cnt, fp)
+  in
 
   let (c1, ll1), (c2, ll2) =
     try
@@ -552,7 +562,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
         let test    = f_ands [fe1; f_not p0; p1] in
         let test, m = ASyncWhile.form_of_expr env (EcMemory.memory evs.es_mr) ml test in
         let c       = s_while (test, cl) in
-        xhyps evs.es_mr m
+        xhyps m
           (f_bdHoareS (mhr, EcMemory.memtype evs.es_ml) inv c f_true FHeq f_r1)
 
       and ll2 =
@@ -561,7 +571,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
         let test    = f_ands [fe1; f_not p0; f_not p1] in
         let test, m = ASyncWhile.form_of_expr env (EcMemory.memory evs.es_ml) mr test in
         let c       = s_while (test, cr) in
-        xhyps evs.es_ml m
+        xhyps m
           (f_bdHoareS (mhr, EcMemory.memtype evs.es_mr) inv c f_true FHeq f_r1)
 
       in (ll1, ll2)
