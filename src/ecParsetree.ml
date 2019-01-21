@@ -295,7 +295,7 @@ and pfrange = [
   | `Range  of pfindex option pair
 ]
 
-and pfindex = [ `Index of int | `Match of pformula ]
+and pfindex = [ `Index of int | `Match of pformula * int option]
 
 (* -------------------------------------------------------------------- *)
 let rec pf_ident ?(raw = false) f =

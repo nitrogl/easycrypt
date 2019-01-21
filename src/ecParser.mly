@@ -1033,8 +1033,12 @@ pfpos:
 | i=sword
     { `Index i }
 
-| f=bracket(form_h)
-    { `Match f }
+| f=bracket(form_h) off=pfoffset?
+    { `Match (f, off) }
+
+pfoffset:
+| PLUS  w=word {  w }
+| MINUS w=word { -w }
 
 pffilter:
 | LBRACKET flat=iboption(SLASH)

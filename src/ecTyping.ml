@@ -2330,7 +2330,7 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
               | `Index i ->
                   i
 
-              | `Match ppt ->
+              | `Match (ppt, off) ->
                   let ps   = ref Mid.empty in
                   let ue   = EcUnify.UniEnv.create None in
                   let pt   = trans_pattern env ps ue ppt in
@@ -2345,8 +2345,10 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
                     with EcMatching.MatchFailure -> false in
 
                   match List.Exceptionless.findi test f with
-                  | Some (i, _) -> i+1
-                  | None -> assert false
+                  | Some (i, _) ->
+                      (i+1) + (odfl 0 off)
+                  | None ->
+                      tyerror loc env (InvalidFilter (FE_NoMatch))
 
             in
 
