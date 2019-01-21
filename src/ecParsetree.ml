@@ -275,10 +275,17 @@ and pgty =
 | PGTY_Mem
 
 and pffilter =
-| PFRange      of bool * [ `Single of int | `Range of int option pair] list
+| PFRange      of bool * pfrange list
 | PFMatch      of bool * psymbol * pformula
 | PFMatchBuild of bool * psymbol list * pformula * pformula
 | PFExclude    of bool * bool * pformula
+
+and pfrange = [
+  | `Single of pfindex
+  | `Range  of pfindex option pair
+]
+
+and pfindex = [ `Index of int | `Match of pformula ]
 
 (* -------------------------------------------------------------------- *)
 let rec pf_ident ?(raw = false) f =

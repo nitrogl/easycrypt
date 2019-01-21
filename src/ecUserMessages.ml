@@ -326,6 +326,9 @@ end = struct
     | InvalidFilter (FE_InvalidIndex i) ->
         msg "invalid filter index: %d" i
 
+    | InvalidFilter FE_NoMatch ->
+        msg "invalid filter pattern (no match)"
+
     | FunNotInModParam name ->
         msg "the function %a is not provided by a module parameter"
           pp_qsymbol name

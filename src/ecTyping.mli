@@ -60,6 +60,7 @@ type mem_error =
 
 type filter_error =
 | FE_InvalidIndex of int
+| FE_NoMatch
 
 type tyerror =
 | UniVarNotAllowed

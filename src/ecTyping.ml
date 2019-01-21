@@ -69,6 +69,7 @@ type mem_error =
 
 type filter_error =
 | FE_InvalidIndex of int
+| FE_NoMatch
 
 type tyerror =
 | UniVarNotAllowed
@@ -2160,6 +2161,41 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
                 (if deep then flatten deep f1 else [f1]) @ (flatten deep f2)
               with DestrError _ -> [f] in
 
+            let trans_idx (f : form list) (idx : pfindex) =
+              match idx with
+              | `Index i ->
+                  i
+
+              | `Match ppt ->
+                  let ps   = ref Mid.empty in
+                  let ue   = EcUnify.UniEnv.create None in
+                  let pt   = trans_pattern env ps ue ppt in
+                  let ev   = EcMatching.MEV.of_idents (Mid.keys !ps) `Form in
+                  let mode = EcMatching.fmrigid in
+                  let hyps = EcEnv.LDecl.init env [] in
+
+                  let test (_ : int) f =
+                    try
+                      ignore (EcMatching.f_match mode hyps (ue, ev) ~ptn:pt f);
+                      true
+                    with EcMatching.MatchFailure -> false in
+
+                  match List.Exceptionless.findi test f with
+                  | Some (i, _) -> i+1
+                  | None -> assert false
+
+            in
+
+            let trans_rg (f : form list) (rg : pfrange) =
+              match rg with
+              | `Single idx ->
+                  `Single (trans_idx f idx)
+
+              | `Range (i1, i2) ->
+                  let i1 = omap (trans_idx f) i1 in
+                  let i2 = omap (trans_idx f) i2 in
+                  `Range (i1, i2) in
+
             let filter1 (fs : form list) ij =
               let n = List.length fs in
               let norm (x as ox) =
@@ -2187,8 +2223,9 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
             let filter f pf =
               match pf with
               | PFRange (deep, rgs) ->
-                  let f = flatten deep f in
-                  let f = List.map (filter1 f) rgs in
+                  let f   = flatten deep f in
+                  let rgs = List.map (trans_rg f) rgs in
+                  let f   = List.map (filter1 f) rgs in
                   f_ands (List.flatten f)
 
               | PFMatch (deep, x, ppt) ->
