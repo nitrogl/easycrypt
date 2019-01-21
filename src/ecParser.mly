@@ -1050,8 +1050,14 @@ pffilter:
 
   { PFMatchBuild (flat, xs, f, h) }
 
-| LBRACE flat=iboption(SLASH) TILD rooted=iboption(HAT) h=form_h RBRACE
-  { PFExclude (flat, rooted, h) }
+| LPBRACE
+    flat=iboption(SLASH)
+    exclude=iboption(TILD)
+    rooted=iboption(HAT)
+    h=form_h
+  RPBRACE
+
+  { PFKeep (flat, rooted, exclude, h) }
 
 sform_u(P):
 | x=P
