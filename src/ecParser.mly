@@ -1029,11 +1029,18 @@ qident_or_res_or_glob:
 | x=loc(RES) { GVvar (mk_loc x.pl_loc ([], "res")) }
 | GLOB mp=loc(mod_qident) { GVglob mp }
 
+pfpos:
+| i=sword
+    { `Index i }
+
+| f=bracket(form_h)
+    { `Match f }
+
 pffilter:
 | LBRACKET flat=iboption(SLASH)
     rg=plist0(
-      i=sword? COLON j=sword? { `Range (i, j) }
-    | i=sword { `Single i }, COMMA)
+      i=pfpos? COLON j=pfpos? { `Range (i, j) }
+    | i=pfpos { `Single i }, COMMA)
   RBRACKET
 
   { PFRange (flat, rg) }

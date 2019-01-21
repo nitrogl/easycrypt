@@ -371,6 +371,9 @@ end = struct
     | InvalidFilter (FE_InvalidIndex i) ->
         msg "invalid filter index: %d" i
 
+    | InvalidFilter FE_NoMatch ->
+        msg "invalid filter pattern (no match)"
+
     | InvalidMatch fxerror ->
         pp_fxerror env1 fmt fxerror
 
