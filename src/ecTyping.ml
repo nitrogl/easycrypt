@@ -2434,7 +2434,7 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
                   let subst = EcMatching.MEV.assubst ue ev in
                   Fsubst.f_subst subst tg
 
-              | PFExclude (deep, rooted, ppt) ->
+              | PFKeep (deep, rooted, exclude, ppt) ->
                   let f    = flatten deep f in
                   let ps   = ref Mid.empty in
                   let ue   = EcUnify.UniEnv.create None in
@@ -2446,8 +2446,8 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
                   let test target =
                     try
                       ignore (EcMatching.f_match mode hyps (ue, ev) ~ptn:pt target);
-                      false
-                    with EcMatching.MatchFailure -> true in
+                      true
+                    with EcMatching.MatchFailure -> false in
 
                   let test target =
                     if rooted then test target else
@@ -2464,10 +2464,14 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
 
                     try
                       ignore (EcMatching.FPosition.select (fun _ -> test) target);
-                      true
-                    with E.MatchFound -> false
+                      false
+                    with E.MatchFound -> true in
 
-                  in f_ands (List.filter test f)
+                  let test target =
+                    let b = test target in
+                    if exclude then not b else b in
+
+                  f_ands (List.filter test f)
 
             in List.fold_left filter f filters
     end

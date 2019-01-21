@@ -288,7 +288,7 @@ and pffilter =
 | PFRange      of bool * pfrange list
 | PFMatch      of bool * psymbol * pformula
 | PFMatchBuild of bool * psymbol list * pformula * pformula
-| PFExclude    of bool * bool * pformula
+| PFKeep       of bool * bool * bool * pformula
 
 and pfrange = [
   | `Single of pfindex
