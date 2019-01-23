@@ -163,3 +163,23 @@ let rec process_swap1 info tc =
 (* -------------------------------------------------------------------- *)
 let process_swap info tc =
   FApi.t_seqs (List.map process_swap1 info) tc
+
+(* -------------------------------------------------------------------- *)
+
+let rec process_interleave info tc =
+  let loc = info.pl_loc in
+  let (side, (pos1, n1), (pos2, n2), k) = info.pl_desc in
+  if not (pos1 + k * n1 <= pos2) then
+    tc_error_lazy (!!tc) (fun fmt ->
+        Format.fprintf fmt "invalide interleace range : %i + %i * %i <= %i"
+                          pos1 k n1 pos2);
+  let rec aux pos1 pos2 k tc =
+    if k <= 0 then t_id tc
+    else
+      FApi.t_seq
+        (process_swap1 {pl_desc = side, SKmoveinter (pos2, pos2+n2-1,
+                                                     (pos1+n1) - pos2);
+                        pl_loc  = loc})
+        (aux (pos1 + n1 + n2) (pos2+n2) (k-1))
+          tc in
+    aux pos1 pos2 k tc
