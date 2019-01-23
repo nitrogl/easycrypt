@@ -1040,22 +1040,22 @@ pffilter:
 
   { PFRange (flat, rg) }
 
-| LBRACE flat=iboption(SLASH) x=ident IN h=form_h RBRACE
+| LPBRACE flat=iboption(SLASH) x=ident IN h=form_h RPBRACE
 
   { PFMatch (flat, x, h) }
 
-| LBRACE flat=iboption(SLASH)
+| LPBRACE flat=iboption(SLASH)
     f=form FOR xs=plist1(ident, COMMA) IN h=form_h
-  RBRACE
+  RPBRACE
 
   { PFMatchBuild (flat, xs, f, h) }
 
-| LPBRACE
+| LBRACE
     flat=iboption(SLASH)
     exclude=iboption(TILD)
     rooted=iboption(HAT)
     h=pffilter_pattern
-  RPBRACE
+  RBRACE
 
   { PFKeep (flat, rooted, exclude, h) }
 
