@@ -455,6 +455,7 @@
 %token INCLUDE
 %token INDUCTIVE
 %token INLINE
+%token INTERLEAVE
 %token INSTANCE
 %token IOTA
 %token IS
@@ -2723,6 +2724,14 @@ byequivopt:
           (Some ("invalid option: " ^ (unloc x)))
   }
 
+interleavepos:
+|LBRACKET c=word COLON n=word RBRACKET
+  { c, n }
+
+interleave_info:
+| s=side? c1=interleavepos c2=interleavepos k=word
+   { (s, c1, c2, k) }
+
 phltactic:
 | PROC
    { Pfun `Def }
@@ -2779,6 +2788,9 @@ phltactic:
 
 | SWAP info=iplist1(loc(swap_info), COMMA) %prec prec_below_comma
     { Pswap info }
+
+| INTERLEAVE info=loc(interleave_info)
+    { Pinterleave info }
 
 | CFOLD s=side? c=codepos NOT n=word
     { Pcfold (s, c, Some n) }
