@@ -219,6 +219,10 @@ val e_none     : ty -> expr
 val e_some     : expr -> expr
 val e_oget     : expr -> ty -> expr
 
+(* -------------------------------------------------------------------- *)
+val e_proj_simpl : expr -> int -> ty -> expr
+
+(* -------------------------------------------------------------------- *)
 val is_local     : expr -> bool
 val is_var       : expr -> bool
 val is_tuple_var : expr -> bool
