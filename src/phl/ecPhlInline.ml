@@ -141,6 +141,7 @@ module LowInternal = struct
             List.map2 (fun lv (pv, ty) -> i_asgn(LvVar lv, e_var pv ty)) lvs auxs in
           me, s1 @ s2
         | Some r, Some lv ->
+          let r = LowSubst.esubst subst r in
           me, [i_asgn (lv, r)] in
 
       me, prelude @ body.s_node @ resasgn in
