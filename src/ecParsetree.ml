@@ -524,10 +524,12 @@ type async_while_info = {
 }
 
 (* -------------------------------------------------------------------- *)
+type use_tuple = [ `UseTuple | `DoNotUseTuple] option
+
 type inline_info = [
-  | `ByName    of oside * (pgamepath list * int list option)
-  | `CodePos   of (oside * codepos)
-  | `All       of oside
+  | `ByName    of oside * use_tuple * (pgamepath list * int list option)
+  | `CodePos   of (oside * use_tuple * codepos)
+  | `All       of oside * use_tuple
 ]
 
 (* -------------------------------------------------------------------- *)
