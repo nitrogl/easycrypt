@@ -2724,14 +2724,13 @@ byequivopt:
           (Some ("invalid option: " ^ (unloc x)))
   }
 
-
 interleavepos:
 |LBRACKET c=word COLON n=word RBRACKET
   { c, n }
 
 interleave_info:
-| s=side? c1=interleavepos c2=interleavepos k=word
-   { (s, c1, c2, k) }
+| s=side? c1=interleavepos c2=interleavepos c3=interleavepos* k=word
+   { (s, c1, c2 :: c3, k) }
 
 use_tuple:
 | LBRACKET b=boption(MINUS) x=lident RBRACKET {
