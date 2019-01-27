@@ -415,7 +415,7 @@ type swap_kind =
   | SKmovei     of int * int
   | SKmoveinter of int * int * int
 
-type interleave_info = oside * (int * int) * (int * int) * int
+type interleave_info = oside * (int * int) * ((int * int) list) * int
 
 type pipattern =
   | PtAny
