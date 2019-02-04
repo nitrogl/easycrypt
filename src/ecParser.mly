@@ -1064,10 +1064,17 @@ pffilter:
     flat=iboption(SLASH)
     exclude=iboption(TILD)
     rooted=iboption(HAT)
-    h=form_h
+    h=pffilter_pattern
   RBRACE
 
   { PFKeep (flat, rooted, exclude, h) }
+
+pffilter_pattern:
+| f=form_h
+    { `Pattern f}
+
+| LBRACE xs=plist0(x=qoident s=loc(pside)? { (x, s) }, COMMA) RBRACE
+    { `VarSet xs }
 
 sform_u(P):
 | x=P

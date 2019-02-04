@@ -94,6 +94,7 @@ type tyerror =
 | UnknownRecFieldName    of qsymbol
 | UnknownInstrMetaVar    of symbol
 | UnknownMetaVar         of symbol
+| UnknownProgVar         of qsymbol * EcMemory.memory
 | DuplicatedRecFieldName of symbol
 | MissingRecField        of symbol
 | MixingRecFields        of EcPath.path tuple2
@@ -2187,6 +2188,12 @@ let transmem env m =
       (fst me)
 
 (* -------------------------------------------------------------------- *)
+let transpvar env side p =
+  match EcEnv.Var.lookup_progvar_opt ~side (unloc p) env with
+  | Some (`Var p, _) -> p
+  | _ -> tyerror p.pl_loc env (UnknownProgVar (unloc p, side))
+
+(* -------------------------------------------------------------------- *)
 let trans_topmsymbol env gp =
   (* FIXME *)
   let (mp,_) = trans_msymbol env gp in
@@ -2439,31 +2446,61 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
               | PFKeep (deep, rooted, exclude, ppt) ->
                   let f    = flatten deep f in
                   let ps   = ref Mid.empty in
-                  let ue   = EcUnify.UniEnv.create None in
-                  let pt   = trans_pattern env ps ue ppt in
-                  let ev   = EcMatching.MEV.of_idents (Mid.keys !ps) `Form in
-                  let mode = EcMatching.fmrigid in
-                  let hyps = EcEnv.LDecl.init env [] in
+
+                  let module E = struct exception MatchFound end in
+
+                  let test =
+                    match ppt with
+                    | `Pattern ppt ->
+                         let ue   = EcUnify.UniEnv.create None in
+                         let pt   = trans_pattern env ps ue ppt in
+                         let ev   = EcMatching.MEV.of_idents (Mid.keys !ps) `Form in
+                         let mode = EcMatching.fmrigid in
+                         let hyps = EcEnv.LDecl.init env [] in
+
+                         let test target =
+                           try
+                             ignore (EcMatching.f_match mode hyps (ue, ev) ~ptn:pt target);
+                             raise E.MatchFound
+                           with EcMatching.MatchFailure -> `Continue in
+
+                         let test target =
+                           if rooted then test target else
+
+                           try
+                             ignore (EcMatching.f_match mode hyps (ue, ev) ~ptn:pt target);
+                             raise E.MatchFound
+                           with EcMatching.MatchFailure ->
+                             `Continue
+
+                         in test
+
+                    | `VarSet xs ->
+                        let trans1 (x, s) =
+                          let mem =
+                            match s with
+                            | None -> odfl mhr (EcEnv.Memory.get_active env)
+                            | Some s -> transmem env s
+
+                          in (transpvar env mem x, mem) in
+
+                        let xs = List.map trans1 xs in
+
+                        let test target =
+                          match target.f_node with
+                          | Fpvar (p, m) ->
+                              if (List.exists (fun (p', m') ->
+                                    EcMemory.mem_equal m m' &&
+                                    EcEnv.NormMp.pv_equal env p p')
+                                  xs)
+                              then raise E.MatchFound else `Continue
+
+                          | _ -> `Continue
+
+                        in test
+                  in
 
                   let test target =
-                    try
-                      ignore (EcMatching.f_match mode hyps (ue, ev) ~ptn:pt target);
-                      true
-                    with EcMatching.MatchFailure -> false in
-
-                  let test target =
-                    if rooted then test target else
-
-                    let module E = struct exception MatchFound end in
-
-                    let test target =
-                      try
-                        ignore (EcMatching.f_match mode hyps (ue, ev) ~ptn:pt target);
-                        raise E.MatchFound
-                      with EcMatching.MatchFailure ->
-                        `Continue
-                    in
-
                     try
                       ignore (EcMatching.FPosition.select (fun _ -> test) target);
                       false
