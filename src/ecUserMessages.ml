@@ -208,6 +208,10 @@ end = struct
     | AbbrevLowArgs ->
         msg "this abbreviation is not applied enough"
 
+    | UnknownProgVar (p, mem) ->
+        msg "unknown program variable (in %a): `%a'"
+          (EcPrinting.pp_mem env) mem pp_qsymbol p
+
     | UnknownVarOrOp (name, []) ->
         msg "unknown variable or constant: `%a'" pp_qsymbol name
 

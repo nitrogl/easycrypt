@@ -73,6 +73,7 @@ type tyerror =
 | UnknownRecFieldName    of qsymbol
 | UnknownInstrMetaVar    of symbol
 | UnknownMetaVar         of symbol
+| UnknownProgVar         of qsymbol * EcMemory.memory
 | DuplicatedRecFieldName of symbol
 | MissingRecField        of symbol
 | MixingRecFields        of EcPath.path tuple2

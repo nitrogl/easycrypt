@@ -278,7 +278,12 @@ and pffilter =
 | PFRange      of bool * pfrange list
 | PFMatch      of bool * psymbol * pformula
 | PFMatchBuild of bool * psymbol list * pformula * pformula
-| PFKeep       of bool * bool * bool * pformula
+| PFKeep       of bool * bool * bool * pffilter_pattern
+
+and pffilter_pattern = [
+  | `Pattern of pformula
+  | `VarSet  of (pqsymbol * psymbol option) list
+]
 
 and pfrange = [
   | `Single of pfindex
