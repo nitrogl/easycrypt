@@ -54,6 +54,7 @@ val tint    : ty
 val treal   : ty
 val tdistr  : ty -> ty
 val toption : ty -> ty
+val tlist   : ty -> ty
 val tcpred  : ty -> ty
 val toarrow : ty list -> ty -> ty
 
@@ -218,6 +219,7 @@ val e_proj     : expr -> int -> ty -> expr
 val e_none     : ty -> expr
 val e_some     : expr -> expr
 val e_oget     : expr -> ty -> expr
+val e_dlist    : ty -> expr -> expr -> expr
 
 (* -------------------------------------------------------------------- *)
 val e_proj_simpl : expr -> int -> ty -> expr

@@ -28,43 +28,6 @@ type i_pat =
 
 and s_pat = (int * i_pat) list
 
-(* -------------------------------------------------------------------- *)
-module LowSubst = struct
-  let pvsubst m pv =
-    odfl pv (PVMap.find pv m)
-
-  let rec esubst m e =
-    match e.e_node with
-    | Evar pv -> e_var (pvsubst m pv) e.e_ty
-    | _ -> EcTypes.e_map (fun ty -> ty) (esubst m) e
-
-  let lvsubst m lv =
-    match lv with
-    | LvVar   (pv, ty)       -> LvVar (pvsubst m pv, ty)
-    | LvTuple pvs            -> LvTuple (List.map (fst_map (pvsubst m)) pvs)
-    | LvMap   (p, pv, e, ty) -> LvMap (p, pvsubst m pv, esubst m e, ty)
-
-  let rec isubst m (i : instr) =
-    let esubst = esubst m in
-    let ssubst = ssubst m in
-
-    match i.i_node with
-    | Sasgn  (lv, e)     -> i_asgn   (lvsubst m lv, esubst e)
-    | Srnd   (lv, e)     -> i_rnd    (lvsubst m lv, esubst e)
-    | Scall  (lv, f, es) -> i_call   (lv |> omap (lvsubst m), f, List.map esubst es)
-    | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
-    | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
-    | Smatch (e, bs)     -> i_match  (esubst e, List.Smart.map (snd_map ssubst) bs)
-    | Sassert e          -> i_assert (esubst e)
-    | Sabstract _        -> i
-
-  and issubst m (is : instr list) =
-    List.Smart.map (isubst m) is
-
-  and ssubst m (st : stmt) =
-    stmt (issubst m st.s_node)
-end
-
 (* --------------------------------------------------------------------- *)
 module LowInternal = struct
   let inline ~use_tuple tc me sp s =
@@ -120,14 +83,14 @@ module LowInternal = struct
           | _   -> [i_asgn(LvTuple newpv, e_tuple args)]
       in
 
-      let body = LowSubst.ssubst subst fdef.f_body in
+      let body = PVSubst.ssubst subst fdef.f_body in
 
       let me, resasgn =
         match fdef.f_ret, lv with
         | None, _ -> me , []
         | Some _, None -> me, []
         | Some r, Some (LvTuple lvs) when not use_tuple ->
-          let r = LowSubst.esubst subst r in
+          let r = PVSubst.esubst subst r in
           let me, auxs =
             let doit me (x, ty) =
               let v = {v_name = symbol_of_pv x; v_type = ty} in
@@ -142,7 +105,7 @@ module LowInternal = struct
             List.map2 (fun lv (pv, ty) -> i_asgn(LvVar lv, e_var pv ty)) lvs auxs in
           me, s1 @ s2
         | Some r, Some lv ->
-          let r = LowSubst.esubst subst r in
+          let r = PVSubst.esubst subst r in
           me, [i_asgn (lv, r)] in
 
       me, prelude @ body.s_node @ resasgn in

@@ -406,6 +406,7 @@
 %token DEBUG
 %token DECLARE
 %token DELTA
+%token DERND
 %token DLBRACKET
 %token DO
 %token DONE
@@ -2931,6 +2932,9 @@ phltactic:
 
 | SIM cm=crushmode? info=eqobs_in
     { Psim (cm, info) }
+
+| DERND
+    { Pdernd }
 
 | REPLACE rk=repl_kind h1=repl_hyp h2=repl_hyp
     { Ptrans_stmt (rk, TFform(fst h1, snd h1, fst h2, snd h2)) }
