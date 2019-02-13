@@ -136,7 +136,7 @@ proof.
   - move => x; rewrite enumP full.
 qed.
 
-lemma nosmt enum_uniq_map_mem (f: t -> t):
+lemma nosmt enum_uniq_mem_isomap (f: t -> t):
   uniq (map f enum) <=> forall x, mem (map f enum) x.
 proof.
   split => pre.
@@ -147,16 +147,16 @@ proof.
     rewrite size_map /card //.
 qed.
 
-lemma nosmt enum_sur_uniq_map (f: t -> t): surjective f <=> uniq (map f enum).
+lemma nosmt enum_sur_uniq_isomap (f: t -> t): surjective f <=> uniq (map f enum).
 proof.
   rewrite /surjective.
   split => pre.
-  - rewrite enum_uniq_map_mem => x.
+  - rewrite enum_uniq_mem_isomap => x.
     rewrite mapP.
     move : (pre x) => [y] concl.
     exists y.
     rewrite enumP concl //.
-  - move => x; move : (enum_uniq_map_mem f); rewrite pre /=.
+  - move => x; move : (enum_uniq_mem_isomap f); rewrite pre /=.
     apply absurd.
     rewrite negb_exists negb_forall /= => ah.
     exists x.
@@ -164,45 +164,7 @@ proof.
     rewrite negb_and ah enumP //.
 qed.
 
-lemma not_uniq_perm (s: 'a list):
-  (! uniq s) <=> exists x xs, perm_eq (x :: x :: xs) s.
-proof.
-  split.
-  - (* => *)
-    elim (s) => //= e l ibase.
-    rewrite negb_and /= => membership.
-    case (!uniq l) => /= luniq.
-    + move : (ibase).
-      rewrite luniq /=.
-      move => [z t] cbase.
-      exists z (e :: t).
-      rewrite -cat1s perm_catCl -cat1s -catA perm_catCl 2!cat_cons perm_cons perm_catCl catA perm_catCl 2!cat1s //.
-    + move : membership.
-      rewrite luniq /= => le.
-      exists e (rem e l).
-      rewrite /= perm_eq_sym perm_cons perm_to_rem => //.
-  - (* <= *)
-    move => [x xs] perm.
-    move : (perm_eq_uniq (x :: x :: xs) s).
-    rewrite perm //=.
-qed.
-
-lemma mem_mem_rem ['a] (x : 'a) (s: 'a list) y:
-  mem s y => x <> y => mem (rem x s) y.
-proof.
-  elim s => // z l ibase.
-  rewrite in_cons.
-  case (y = z) => y_eq_z /=.
-  + rewrite y_eq_z eq_sym.
-    move => z_neq_x.
-    rewrite z_neq_x //.
-  + move => y_in_l x_neq_y.
-    case (z = x) => z_eq_x //=.
-    rewrite y_eq_z /=.
-    apply ibase => //.
-qed.
-
-lemma nosmt enum_inj_uniq_map (f: t -> t): injective f <=> uniq (map f enum).
+lemma nosmt enum_inj_uniq_isomap (f: t -> t): injective f <=> uniq (map f enum).
 proof.
   split.
   - move => inj.
@@ -215,12 +177,12 @@ proof.
         rewrite eqz_leq -(lez_add2l (-1)) andbC -(lez_add2l (-1)) /= -eqz_leq eq_sym size_eq0 => z0.
         rewrite z0 /=.
         exists z => //.
-      move : (enum_uniq_map_mem f).
+      move : (enum_uniq_mem_isomap f).
       rewrite enum_def /= => alleq.
       move => a b fa_fb.
       rewrite alleq (alleq b) //.
     + move => lu.
-      move : (lu); rewrite enum_uniq_map_mem => full.
+      move : (lu); rewrite enum_uniq_mem_isomap => full.
       have : perm_eq (map f enum) enum by apply (enum_mem_uniq_perm (map f enum)); rewrite lu /=.
       apply absurd.
       rewrite negb_forall /=; case => x.
@@ -238,12 +200,12 @@ proof.
       rewrite lu //=.
 qed.
 
-lemma nosmt enum_sur_inj (f: t -> t): surjective f <=> injective f.
+lemma nosmt enum_sur_inj_isom (f: t -> t): surjective f <=> injective f.
 proof.
-  rewrite enum_inj_uniq_map enum_sur_uniq_map //.
+  rewrite enum_inj_uniq_isomap enum_sur_uniq_isomap //.
 qed.
 
-lemma nosmt enum_bij_uniq_map (f: t -> t): bijective f <=> uniq (map f enum).
+lemma nosmt enum_bij_uniq_isomap (f: t -> t): bijective f <=> uniq (map f enum).
 proof.
-  rewrite -sur_inj_bij enum_sur_inj andbb enum_inj_uniq_map //.
+  rewrite -sur_inj_bij enum_sur_inj_isom andbb enum_inj_uniq_isomap //.
 qed.
