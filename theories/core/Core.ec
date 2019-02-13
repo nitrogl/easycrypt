@@ -183,6 +183,28 @@ lemma nosmt inv_eq ['a] (f : 'a -> 'a) :
 proof. by move=> fK; apply/can2_eq. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma nosmt sur_inj_bij (f: 'a -> 'b):
+  surjective f /\ injective f <=> bijective f.
+proof.
+  split; last first.
+  - move=> [g [fK gK]]; split.
+    + by move => x; exists (g x); rewrite gK.
+    + by apply/(can_inj f g).
+  - move => [sur inj].
+    move : (funchoice (fun x y, x = f y) sur) => /= [g] cancel_gf.
+    have cancel_fg: (cancel f g).
+      move : cancel_gf; apply absurd.
+      rewrite 2!negb_forall /=.
+      move => [x] neq.
+      exists (f x); move : neq.
+      apply absurd => /=.
+      rewrite eq_sym; apply inj.
+    exists g.
+    rewrite cancel_fg /= => x.
+    rewrite -cancel_gf //.
+qed.
+
+(* -------------------------------------------------------------------- *)
 (* Any extensional equality can be used to rewrite *)
 lemma ext_rewrite (ext : 'a -> 'a -> bool) (a1 a2 : 'a) P:
    (forall x y, ext x y => x = y) => ext a1 a2 => P a1 <=> P a2.
