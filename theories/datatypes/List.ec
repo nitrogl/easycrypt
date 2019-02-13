@@ -1015,6 +1015,20 @@ proof.
     by move=> _ ->. by move=> _ [-> | /ih ->].
 qed.
 
+lemma mem_mem_rem ['a] (x : 'a) (s: 'a list) y:
+  mem s y => x <> y => mem (rem x s) y.
+proof.
+  elim s => // z l ibase.
+  rewrite in_cons.
+  case (y = z) => y_eq_z /=.
+  + rewrite y_eq_z eq_sym => z_neq_x.
+    rewrite z_neq_x //.
+  + move => y_in_l x_neq_y.
+    case (z = x) => z_eq_x //=.
+    rewrite y_eq_z /=.
+    apply ibase => //.
+qed.
+
 lemma all_rem p (x : 'a) (s : 'a list): all p s => all p (rem x s).
 proof. by move=> /allP h; apply/allP=> y /mem_rem /h. qed.
 
