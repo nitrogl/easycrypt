@@ -33,3 +33,217 @@ proof.
 rewrite /card; have: mem enum witness by rewrite enumP.
 by case: enum=> //= x s _; rewrite addzC ltzS size_ge0.
 qed.
+
+lemma nosmt enum_full x: !uniq (x :: enum).
+proof.
+  rewrite cons_uniq negb_and /= enumP //.
+qed.
+
+lemma nosmt enum_mem_uniq_perm l: (forall x, mem l x) /\ uniq l <=> perm_eq l enum.
+proof.
+  split.
+  - move => [xl lu].
+    move : (enumP) enum_uniq => xe eu.
+    rewrite uniq_perm_eq // => x.
+    rewrite xl xe.
+  - move => le.
+    rewrite (perm_eq_uniq l enum) // enum_uniq /=.
+    move : (perm_eq_mem l enum le).
+    move => pre x.
+    rewrite pre enumP.
+qed.
+
+lemma nosmt enum_mem_perm_undup (l: t list): (forall x, mem l x) <=> perm_eq (undup l) enum.
+proof.
+  split.
+  - rewrite -enum_mem_uniq_perm undup_uniq => xl x.
+    rewrite mem_undup xl.
+  - rewrite -enum_mem_uniq_perm undup_uniq /= => xu x.
+    rewrite -mem_undup xu.
+qed.
+
+lemma nosmt enum_mem_size (l: t list): (forall x, mem l x) => card <= size l.
+proof.
+  rewrite enum_mem_perm_undup /card => pre.
+  move : (perm_eq_size (undup l) enum pre) => rwme.
+  rewrite -rwme size_undup.
+qed.
+
+lemma nosmt enum_lt_card_mem (l: t list):
+  size l < card => exists x, !mem l x.
+proof.
+  rewrite /card.
+  apply absurd => /=.
+  rewrite negb_exists /= => pre.
+  move : (enum_mem_size l pre).
+  rewrite /card -lezNgt //.
+qed.
+
+lemma nosmt enum_uniq_size (l: t list): uniq l => size l <= card.
+proof.
+  move => lu.
+  rewrite uniq_leq_size // => x.
+  rewrite enumP //.
+qed.
+
+lemma nosmt enum_size_uniq_perm l: size l = card /\ uniq l <=> perm_eq l enum.
+proof.
+  rewrite /card; split.
+  + move => [ss lu].
+    rewrite -enum_mem_uniq_perm lu /=.
+    have pre: mem l <= mem enum by move => x; rewrite enumP //.
+    move : (leq_size_perm l enum lu pre).
+    rewrite ss /=.
+    apply absurd.
+    rewrite 2!negb_forall /=; move => [x] x_out.
+    exists x.
+    rewrite -eqboolP x_out enumP //.
+  + move => le.
+    split; first by exact perm_eq_size.
+    apply (perm_uniq l enum).
+    + move => x; exact perm_eq_mem.
+    + exact perm_eq_size.
+    + exact enum_uniq.
+qed.
+
+lemma nosmt enum_uniq_card_max (l: t list): uniq l => size l <= card.
+proof.
+  rewrite /card => lu.
+  rewrite uniq_leq_size // => x; rewrite enumP //.
+qed.
+
+lemma nosmt enum_card_mem (l: t list):
+  size l = card /\ uniq l => forall x, mem l x.
+proof.
+  rewrite /card.
+  move => [ss lu].
+  have pre: mem l <= mem enum by move => x; rewrite enumP //.
+  move : (leq_size_perm l enum lu pre).
+  rewrite ss /=.
+  apply absurd.
+  rewrite 2!negb_forall /=; move => [x] x_out.
+  exists x.
+  rewrite -eqboolP x_out enumP //.
+qed.
+
+lemma nosmt enum_mem_size_uniq (l: t list):
+  (forall x, mem l x) /\ size l = card => uniq l.
+proof.
+  rewrite /card.
+  move => [full lu].
+  rewrite (uniq_size_uniq enum) => //.
+  - rewrite enum_uniq.
+  - move => x; rewrite enumP full.
+qed.
+
+lemma nosmt enum_uniq_map_mem (f: t -> t):
+  uniq (map f enum) <=> forall x, mem (map f enum) x.
+proof.
+  split => pre.
+  + apply enum_card_mem.
+    rewrite size_map /card pre //=.
+  + rewrite (enum_mem_size_uniq (map f enum)).
+    split => //.
+    rewrite size_map /card //.
+qed.
+
+lemma nosmt enum_sur_uniq_map (f: t -> t): surjective f <=> uniq (map f enum).
+proof.
+  rewrite /surjective.
+  split => pre.
+  - rewrite enum_uniq_map_mem => x.
+    rewrite mapP.
+    move : (pre x) => [y] concl.
+    exists y.
+    rewrite enumP concl //.
+  - move => x; move : (enum_uniq_map_mem f); rewrite pre /=.
+    apply absurd.
+    rewrite negb_exists negb_forall /= => ah.
+    exists x.
+    rewrite mapP negb_exists /= => z.
+    rewrite negb_and ah enumP //.
+qed.
+
+lemma not_uniq_perm (s: 'a list):
+  (! uniq s) <=> exists x xs, perm_eq (x :: x :: xs) s.
+proof.
+  split.
+  - (* => *)
+    elim (s) => //= e l ibase.
+    rewrite negb_and /= => membership.
+    case (!uniq l) => /= luniq.
+    + move : (ibase).
+      rewrite luniq /=.
+      move => [z t] cbase.
+      exists z (e :: t).
+      rewrite -cat1s perm_catCl -cat1s -catA perm_catCl 2!cat_cons perm_cons perm_catCl catA perm_catCl 2!cat1s //.
+    + move : membership.
+      rewrite luniq /= => le.
+      exists e (rem e l).
+      rewrite /= perm_eq_sym perm_cons perm_to_rem => //.
+  - (* <= *)
+    move => [x xs] perm.
+    move : (perm_eq_uniq (x :: x :: xs) s).
+    rewrite perm //=.
+qed.
+
+lemma mem_mem_rem ['a] (x : 'a) (s: 'a list) y:
+  mem s y => x <> y => mem (rem x s) y.
+proof.
+  elim s => // z l ibase.
+  rewrite in_cons.
+  case (y = z) => y_eq_z /=.
+  + rewrite y_eq_z eq_sym.
+    move => z_neq_x.
+    rewrite z_neq_x //.
+  + move => y_in_l x_neq_y.
+    case (z = x) => z_eq_x //=.
+    rewrite y_eq_z /=.
+    apply ibase => //.
+qed.
+
+lemma nosmt enum_inj_uniq_map (f: t -> t): injective f <=> uniq (map f enum).
+proof.
+  split.
+  - move => inj.
+    move : enum_uniq => eu.
+    apply (map_inj_in_uniq f enum) => // x y.
+    rewrite 2!enumP /=; exact inj.
+  - case (size enum = 1) => singlet.
+    + have [x] enum_def: exists x, enum = [x].
+        move : singlet; elim : enum => //= z zs ibase.
+        rewrite eqz_leq -(lez_add2l (-1)) andbC -(lez_add2l (-1)) /= -eqz_leq eq_sym size_eq0 => z0.
+        rewrite z0 /=.
+        exists z => //.
+      move : (enum_uniq_map_mem f).
+      rewrite enum_def /= => alleq.
+      move => a b fa_fb.
+      rewrite alleq (alleq b) //.
+    + move => lu.
+      move : (lu); rewrite enum_uniq_map_mem => full.
+      have : perm_eq (map f enum) enum by apply (enum_mem_uniq_perm (map f enum)); rewrite lu /=.
+      apply absurd.
+      rewrite negb_forall /=; case => x.
+      rewrite negb_forall /=; case => y.
+      rewrite negb_imply; move => [fxfy xy].
+      have [zs] expl: exists zs, perm_eq enum (x :: y :: zs).
+        exists (rem x (rem y enum)).
+        move : (perm_to_rem y enum); rewrite enumP /=.
+        move : (perm_to_rem x (rem y enum)).
+        have ->: mem (rem y enum) x by move : (enumP x) => x_in; rewrite eq_sym in xy; rewrite mem_mem_rem //.
+        rewrite /= -(perm_cons y) perm_eq_sym perm_consCA perm_eq_sym => pre1 pre2.
+        rewrite (perm_eq_trans (y :: rem y enum)) //.
+      move : (perm_eq_map f enum (x :: y :: zs) expl); rewrite /= fxfy => clue.
+      move : (perm_eq_uniq (map f enum) (f y :: f y :: map f zs) clue).
+      rewrite lu //=.
+qed.
+
+lemma nosmt enum_sur_inj (f: t -> t): surjective f <=> injective f.
+proof.
+  rewrite enum_inj_uniq_map enum_sur_uniq_map //.
+qed.
+
+lemma nosmt enum_bij_uniq_map (f: t -> t): bijective f <=> uniq (map f enum).
+proof.
+  rewrite -sur_inj_bij enum_sur_inj andbb enum_inj_uniq_map //.
+qed.
