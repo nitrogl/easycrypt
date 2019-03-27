@@ -71,11 +71,8 @@ let destr_map e : expr * prog_var = (* [[move me to ecTypes?]] *)
   | _ -> raise E.Abort
 
 (* -------------------------------------------------------------------- *)
-let t_hoare_declassify_r tc =
-  let concl = FApi.tc1_goal tc in
-  let hs = tc1_as_hoareS tc in
-  let (lv, leakable), s = tc1_last_secasgn tc hs.hs_s in
-  FApi.xmutate1 tc `SecAsgn [concl]
+(* ------------------- Declassification (</) -------------------------- *)
+(* -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_declassify_sided_r side tc =
@@ -91,7 +88,12 @@ let t_equiv_declassify_sided_r side tc =
   
   let (lv, leakable), s' = tc1_last_secasgn tc s in
   let ty_leakable = proj_leakable_ty env (e_ty leakable) in
+  
+  (* Assignment from the instance value of the leakable entry *)
   let e_inst = e_proj leakable 0 ty_leakable in
+  let assignment = s_asgn (lv, e_inst) in
+  
+  (* Flag the map value as "LEAKED" *)
   let e_distr = e_proj leakable 1 (tdistr ty_leakable) in
   let e_leaked = e_op CI.CI_Leakable.p_leaked [] tconfidentiality in
   let map_lv = List.nth (snd (split_args leakable)) 0 in
@@ -99,7 +101,8 @@ let t_equiv_declassify_sided_r side tc =
   let ex, vm = destr_map map_lv in
   let mlv = LvMap((CI.CI_Map.p_set, [xty; mty]), vm, ex, mty) in
   let declassification = s_asgn (mlv, e_tuple [e_inst; e_distr; e_leaked]) in
-  let assignment = s_asgn (lv, e_inst) in
+  
+  (* Build up the mutation *)
   let s' = s_seq s' declassification in
   let s' = s_seq s' assignment in
   let post = es.es_po in
@@ -112,27 +115,12 @@ let t_equiv_declassify_sided_r side tc =
   FApi.xmutate1 tc `SecAsgn [concl]
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_declassify_unsided_r tc =
-  let module E = struct exception Abort end in
-
-  let env = FApi.tc1_env tc in
-  let es = tc1_as_equivS tc in
-  
-  let post = es.es_po in
-  let post = f_andas [post; post] in
-  
-  let concl = f_equivS_r { es with es_po=post; } in
-  FApi.xmutate1 tc `SecAsgn [concl]
-
-(* -------------------------------------------------------------------- *)
 let t_equiv_declassify_r side tc =
   match side with
   | Some side -> t_equiv_declassify_sided_r side tc
-  | None -> t_equiv_declassify_unsided_r tc
+  | None -> tc_error !!tc "side is mandatory"
 
 (* -------------------------------------------------------------------- *)
-let t_hoare_declassify   = FApi.t_low0 "hoare-declassify"   t_hoare_declassify_r
-(* let t_bdhoare_declassify = FApi.t_low0 "bdhoare-declassify" t_bdhoare_declassify_r *)
 let t_equiv_declassify   = FApi.t_low1 "equiv-declassify"   t_equiv_declassify_r
 
 (* -------------------------------------------------------------------- *)
@@ -140,13 +128,7 @@ let process_declassify side tc =
   let concl = FApi.tc1_goal tc in
 
   match side with
-  | None when is_hoareS concl ->
-      t_hoare_declassify tc
-
-(*   | None when is_bdHoareS concl -> *)
-(*       t_bdhoare_declassify tc *)
-
   | _ when is_equivS concl ->
       t_equiv_declassify side tc
 
-  | _ -> tc_error !!tc "invalid arguments"
+  | _ -> tc_error !!tc "conclusion is not equiv"
