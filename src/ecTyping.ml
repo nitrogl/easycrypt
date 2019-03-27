@@ -1911,15 +1911,11 @@ and transinstr
 
   | PSsecrnd (plvalue, prvalue) ->
       let lvalue, lty = translvalue ue env plvalue in
-      let rvalue, rty = transexp env `InProc ue prvalue in begin
-        match as_tdistr (EcEnv.Ty.hnorm rty env) with
-        | Some sty ->
-          unify_or_fail env ue prvalue.pl_loc ~expct:(tdistr sty) rty; (* This is obvious by deconstruction *)
-          unify_or_fail env ue prvalue.pl_loc ~expct:(tleakable sty) lty;
-          [ i_secrnd (lvalue, rvalue) ]
-        | _ ->
-          tyerror plvalue.pl_loc env TypeClassMismatch
-      end
+      let rvalue, rty = transexp env `InProc ue prvalue in
+      let sty = proj_distr_ty env (e_ty rvalue) in
+      unify_or_fail env ue prvalue.pl_loc ~expct:(tdistr sty) rty;
+      unify_or_fail env ue prvalue.pl_loc ~expct:(tleakable sty) lty;
+      [ i_secrnd (lvalue, rvalue) ]
 
   | PSrnd (plvalue, prvalue) ->
       let lvalue, lty = translvalue ue env plvalue in
