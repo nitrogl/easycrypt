@@ -153,6 +153,8 @@ let f_lossless ty d =
   f_app (fop_lossless ty) [d] tbool
 
 (* -------------------------------------------------------------------- *)
+let fop_is_secret ty =
+  f_op CI.CI_Leakable.p_is_secret  [ty] (toarrow [tleakable ty] tbool)
 let fop_is_leaked ty =
   f_op CI.CI_Leakable.p_is_leaked  [ty] (toarrow [tleakable ty] tbool)
 let fop_inst      ty =
@@ -160,10 +162,15 @@ let fop_inst      ty =
 
 let proj_leakable_ty env ty = proj_tuple_env_ty 0 env ty (proj_constr_ty 0 ty)
 
+let f_is_secret ty l =
+  f_app (fop_is_secret ty) [l] tbool
 let f_is_leaked ty l =
   f_app (fop_is_leaked ty) [l] tbool
 let f_inst ty l =
   f_app (fop_inst ty) [l] ty
+  
+let f_secret = f_op CI.CI_Leakable.p_secret [] tconfidentiality
+let f_leaked = f_op CI.CI_Leakable.p_leaked [] tconfidentiality
 
 (* -------------------------------------------------------------------- *)
 let f_losslessF f = f_bdHoareF f_true f f_true FHeq f_r1

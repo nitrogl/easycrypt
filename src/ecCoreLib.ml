@@ -109,8 +109,8 @@ end
 module CI_Distr = struct
   let i_Distr = "Distr"
   let p_Distr = EcPath.pqname p_top i_Distr
-  let p_distr = _Pervasive "distr"
   let _Distr  = fun x -> EcPath.pqname p_Distr x
+  let p_distr = _Distr "distr"
 
   let p_dbool      = EcPath.extend p_top ["DBool"; "dbool"]
   let p_dbitstring = EcPath.extend p_Distr ["Dbitstring"; "dbitstring"]
@@ -125,16 +125,18 @@ end
 
 (* -------------------------------------------------------------------- *)
 module CI_Leakable = struct
-  let i_Leakable = "Leakable"
-  let p_Leakable = EcPath.pqname p_top i_Leakable
-  let _Leakable  = fun x -> EcPath.pqname p_Leakable x
-  let p_leakable = _Leakable "leakable"
+  let i_Leakable        = "Leakable"
+  let p_Leakable        = EcPath.pqname p_top i_Leakable
+  let _Leakable         = fun x -> EcPath.pqname p_Leakable x
+  let p_leakable        = _Leakable "leakable"
+  let p_confidentiality = _Leakable "confidentiality"
 
+  let p_is_secret = _Leakable "is_secret"
   let p_is_leaked = _Leakable "is_leaked"
   let p_inst = _Leakable "inst"
-
-  let p_min_leakage = _Leakable "MIN_LEAKAGE"
-  let p_secret      = _Leakable "SECRET"
+  
+  let p_secret = _Leakable "SECRET"
+  let p_leaked = _Leakable "LEAKED"
 end
 
 (* -------------------------------------------------------------------- *)

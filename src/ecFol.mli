@@ -69,8 +69,12 @@ val f_weight   : EcTypes.ty -> form -> form
 val f_lossless : EcTypes.ty -> form -> form
 
 (* soft constructors - leakable *)
+val f_is_secret : EcTypes.ty -> form -> form
 val f_is_leaked : EcTypes.ty -> form -> form
 val f_inst      : EcTypes.ty -> form -> form
+
+val f_secret    : form
+val f_leaked    : form
 
 (* common functions *)
 val f_identity : ?name:EcSymbols.symbol -> EcTypes.ty -> form
