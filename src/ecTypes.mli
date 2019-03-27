@@ -48,14 +48,15 @@ val tglob   : EcPath.mpath -> ty
 val tpred   : ty -> ty
 
 (* -------------------------------------------------------------------- *)
-val tunit     : ty
-val tbool     : ty
-val tint      : ty
-val treal     : ty
-val tdistr    : ty -> ty
-val tleakable : ty -> ty
-val tcpred    : ty -> ty
-val toarrow   : ty list -> ty -> ty
+val tunit            : ty
+val tbool            : ty
+val tint             : ty
+val treal            : ty
+val tdistr           : ty -> ty
+val tconfidentiality : ty
+val tleakable        : ty -> ty
+val tcpred           : ty -> ty
+val toarrow          : ty list -> ty -> ty
 
 val tytuple_flat : ty -> ty list
 val tyfun_flat   : ty -> (dom * ty)
@@ -63,10 +64,6 @@ val tyfun_flat   : ty -> (dom * ty)
 (* -------------------------------------------------------------------- *)
 val is_tdistr : ty -> bool
 val as_tdistr : ty -> ty option
-
-(* -------------------------------------------------------------------- *)
-val is_tleakable : ty -> bool
-val as_tleakable : ty -> ty option
 
 (* -------------------------------------------------------------------- *)
 exception FoundUnivar

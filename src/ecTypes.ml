@@ -125,13 +125,14 @@ let tfun t1 t2   = mk_ty (Tfun (t1, t2))
 let tglob m      = mk_ty (Tglob m)
 
 (* -------------------------------------------------------------------- *)
-let tunit        = tconstr EcCoreLib.CI_Unit    .p_unit     []
-let tbool        = tconstr EcCoreLib.CI_Bool    .p_bool     []
-let tint         = tconstr EcCoreLib.CI_Int     .p_int      []
-let tdistr ty    = tconstr EcCoreLib.CI_Distr   .p_distr    [ty]
-let tleakable ty = tconstr EcCoreLib.CI_Leakable.p_leakable [ty]
-let treal        = tconstr EcCoreLib.CI_Real    .p_real     []
-let tcpred ty    = tfun ty tbool
+let tunit            = tconstr EcCoreLib.CI_Unit    .p_unit            []
+let tbool            = tconstr EcCoreLib.CI_Bool    .p_bool            []
+let tint             = tconstr EcCoreLib.CI_Int     .p_int             []
+let tdistr ty        = tconstr EcCoreLib.CI_Distr   .p_distr           [ty]
+let tconfidentiality = tconstr EcCoreLib.CI_Leakable.p_confidentiality []
+let tleakable ty     = tconstr EcCoreLib.CI_Leakable.p_leakable        [ty]
+let treal            = tconstr EcCoreLib.CI_Real    .p_real            []
+let tcpred ty        = tfun ty tbool
 
 let ttuple lt    =
   match lt with
@@ -173,7 +174,7 @@ let as_tleakable (ty : ty) =
       when EcPath.p_equal p EcCoreLib.CI_Leakable.p_leakable
     -> Some sty
   | Ttuple (lty)
-      when List.length lty = 2 && List.nth lty 1 = tbool
+      when List.length lty = 3
     -> Some (List.nth lty 0)
 
   | _ -> None
@@ -1048,3 +1049,4 @@ let split_args e =
   match e.e_node with
   | Eapp (e, args) -> (e, args)
   | _ -> (e, [])
+
