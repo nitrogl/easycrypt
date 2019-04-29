@@ -1,0 +1,436 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2016--2018 - Roberto Metere <r.metere2@ncl.ac.uk>
+ *
+ * Distributed under the terms of the CeCILL-B-V1 license
+ * -------------------------------------------------------------------- *)
+
+(*
+ * A formalisation of Structured Encryption
+ *)
+require import Distr.
+require import DBool.
+require import SmtMap.
+require import SmtMapExt.
+require import FSet.
+require import Int.
+require import List.
+require import AllCore Real.
+require (*--*) Lazy NewROM.
+require (*--*) Birthday.
+require import StdRing StdBigop StdOrder.
+(*---*) import RField IntOrder RealOrder.
+require import TacticsExt.
+
+type D.
+type C.
+
+op cdistr: { C distr | is_lossless cdistr /\ is_funiform cdistr } as cdistr_ful.
+op csample: D -> C distr = fun _ => cdistr.
+
+(* We want the counter domain to be finite *)
+clone FinType as Codomain with
+  type t <- C.
+
+(* Size of codomain *)
+const n : {int | 0 <= n} as n_ge0.
+
+op hash: D -> C.
+
+module type HashFunction = {
+  proc hash(x: D): C
+}.
+
+(* Algorithmic wrapper for the hash operation (concrete hash) *)
+module Hash: HashFunction = {
+  proc hash(x: D): C = {
+    return hash x;
+  }
+}.
+
+(* Random Oracle Model *)
+theory HashOracleTheory.
+  clone import NewROM as ROM with
+    type from <- D,
+    type to   <- C,
+    op dsample <- csample
+  rename "ARO" as "OracleAccess"
+  rename "Dist" as "HDist".
+  
+  clone import Lazy as HashROM with
+    type from <- D,
+    type to   <- C,
+    op dsample <- csample
+  rename "RO" as "RO" (* random o-oracle *).
+
+  module HOracle(H: HashFunction): Oracle = {
+    proc init(): unit = {}
+
+    proc o(x: D): C = { (* the hash *)
+      var y;
+
+      y <@ H.hash(x);
+
+      return y;
+    }
+  }.
+
+  (* This is a hash function too, its access is the (algorithmic variant of the) hash function itself *)
+  module type HashOracle = {
+    proc init(): unit
+    proc hash(x: D): C
+  }.
+
+  (* Random hash-oracle from random o-oracle *)
+  module HashRO: HashOracle = {
+    proc init = RO.init
+    proc hash(x: D): C = {
+      var y;
+
+      y <@ RO.o(x);
+
+      return y;
+    }
+  }.
+end HashOracleTheory.
+
+clone import HashOracleTheory as HT1
+rename "HOracle" as "HO1".
+clone import HashOracleTheory as HT2
+rename "HOracle" as "HO2".
+import HashOracleTheory.ROM.
+import HashOracleTheory.HashROM.
+
+(* Bound *)
+const q : {int | 0 <= q} as q_ge0.
+
+module BoundedOracle(O: OracleAccess): Oracle = {
+  var i: int
+
+  proc init() = {
+    i = 0;
+  }
+
+  proc o(x: D): C = {
+    var y;
+
+    if (i < q) {
+      y <@ O.o(x);
+      i = i + 1;
+    } else {
+      y = witness;
+    }
+
+    return y;
+  }
+}.
+
+module HashDistROM(D: HDist, O: OracleAccess) = {
+  module BO = BoundedOracle(O)
+  module BD = D(BO)
+
+  proc distinguish(): bool = {
+    var g;
+
+    BO.init();
+    g <@ BD.distinguish();
+
+    return g;
+  }
+}.
+
+(* Heavily inspired by RP_RF *)
+section CollisionProbability.
+  clone import Birthday as BirthdayTheory with
+    type T  <- C,
+
+    op q  <- q,
+    op uT <- cdistr,
+    op maxu <- witness
+  proof *.
+    realize ge0_q by apply q_ge0.
+    realize maxuP by move => *; case: cdistr_ful => ll fu; apply StdOrder.RealOrder.lerr_eq; apply fu.
+
+  (* We construct a Birthday Bound adversary from the IND experiment. *)
+  module A(D: HDist, S: ASampler) = {
+    (* We simulate a hash-oracle using the s-oracle *)
+    module HO = {
+      proc init = RO.init
+
+      proc o(x: D): C = {
+        if (!dom RO.m x) {
+          RO.m.[x] = S.s();
+        }
+        return oget RO.m.[x];
+      }
+    }
+
+    (* Recall from the Birthday clone that Birthday Bound adversaries
+      * are restricted to make at most q oracle queries. *)
+    proc a(): unit = {
+      var b:bool;
+      b <@ IND(HO, HashDistROM(D)).main();
+    }
+  }.
+
+  lemma Aa_ll (D<: HDist) (S<: ASampler):
+    islossless HashDistROM(D, A(D, S).HO).BD.distinguish =>
+    islossless S.s =>
+    islossless A(D, S).a.
+  proof.
+    move => Ddistinguish_ll Ss_ll; proc; inline*; wp.
+    call Ddistinguish_ll.
+    wp; skip; trivial.
+  qed.
+
+
+  local lemma hash_collision (D<: HDist{Sample,RO,BoundedOracle}) &m:
+    Pr[IND(RO, HashDistROM(D)).main() @ &m: fmap_collision RO.m] = Pr[Exp(Sample, A(D)).main() @ &m: !uniq Sample.l].
+  proof.
+    byequiv (_: ={glob D} ==> fmap_collision RO.m{1} <=> !uniq Sample.l{2})=> //=.
+  proc; inline*; wp.
+    call (_:    ={RO.m, BoundedOracle.i}
+              /\ (forall x, rng RO.m x <=> mem Sample.l x){2}
+              /\ (fmap_collision RO.m{1} <=> !uniq Sample.l{2})
+          ).
+    proc; inline*; sp; if => //=; last by wp; skip; progress; trivial.
+    case (dom RO.m{1} x{1}); move => *.
+      (* in memory *)
+      rcondf{1} 3; first by progress; rnd; wp; skip; trivial.
+      rcondf{2} 2; first by progress; wp; skip; progress.
+      wp; rnd{1}; wp; skip; progress; rewrite /csample; smt w=cdistr_ful.
+      (* not in memory *)
+      rcondt{1} 3; first by progress; rnd; wp; skip; trivial.
+      rcondt{2} 2; first by progress; wp; skip; progress.
+      wp; rnd; wp; skip; (progress; first by smt w=cdistr_ful).
+      + rewrite -H.
+        case (x1 = y0L) => x1_y0L //=.
+        move : H6.
+        rewrite rngE /=.
+        move => [z mz].
+        have z_neq_x: z <> x{2} by move : mz; apply absurd => /= z_x; rewrite z_x get_set_eqE // eq_sym; move : x1_y0L; apply absurd => //=.
+        move : mz; rewrite get_set_neqE // => mz.
+        rewrite rngE /=.
+        exists z => //.
+      + move : H6.
+        case (x1 = y0L) => x1_y0L //=.
+        - rewrite x1_y0L rngE /=.
+          exists x{2}.
+          rewrite get_set_sameE //.
+        - rewrite -H rngE /=.
+          move => [z mz].
+          rewrite rngE /=.
+          exists z; smt.
+       + smt.
+       + smt.
+    wp; skip; progress; smt.
+  qed.
+
+  lemma hash_probability_collision (D<: HDist{Sample,RO,BoundedOracle}) (S<: ASampler{A(D)}) &m:
+    Pr[IND(RO, HashDistROM(D)).main() @ &m: fmap_collision RO.m] <= (q^2)%r * mu1 cdistr witness.
+  proof.
+    rewrite (hash_collision D &m).
+    have ->: Pr[Exp(Sample, A(D)).main() @ &m: !uniq Sample.l] = Pr[Exp(Sample, A(D)).main() @ &m: size Sample.l <= q /\ !uniq Sample.l].
+      byequiv (_: ={glob D} ==> ={Sample.l} /\ size Sample.l{2} <= q)=> //=.
+      conseq (_: _ ==> ={Sample.l}) _ (_: _ ==> size Sample.l <= q)=> //=.
+        proc; inline*.
+        seq 3: (size Sample.l = 0 /\ RO.m = empty /\ BoundedOracle.i = 0).
+          wp; skip; progress.
+        wp; call (_: size Sample.l <= BoundedOracle.i /\ BoundedOracle.i <= q).
+          proc; inline *.
+          if => //=; last by wp; skip; progress; trivial.
+          sp; if => //; first by wp; rnd; skip; progress; smt.
+          wp; skip; progress; smt.
+        skip; smt.
+      sim.
+    fel 1 (size Sample.l) (fun x, q%r * mu1 cdistr witness) q (!uniq Sample.l) []=> //.
+    + rewrite Bigreal.sumr_const count_predT size_range /=; rewrite max_ler 1:smt mulrA ler_wpmul2r 1:smt //.
+      have ->: q^2 = q * q by rewrite (_:2 = 1 + 1) // powS // pow1.
+      rewrite -fromintM le_fromint ler_wpmul2r 1:ge0_q /#.
+    + by inline*; auto.
+    + proc;wp; rnd (mem Sample.l); skip=> // /> &hr ???.
+        have := Mu_mem.mu_mem_le_size (Sample.l{hr}) cdistr (mu1 cdistr witness) _.
+          move=> x _;rewrite maxuP.
+      move => /ler_trans Hle;apply/Hle/ler_wpmul2r;smt (mu_bounded).
+    move => c; proc; auto=> /#.
+  qed.
+end section CollisionProbability.
+
+(* Encapsulating the IND experiment as a direct comparison of two oracles (both emulated by HO), each using different HashFunction *)
+module HashExp(H1: HashFunction, H2: HashFunction, D: HDist) = {
+  proc game(real: bool) : bool = {
+    var g;
+
+    if (real) {
+      HO1(H1).init();
+      g <@ D(HO1(H1)).distinguish();
+    } else {
+      HO2(H2).init();
+      g <@ D(HO2(H2)).distinguish();
+    }
+
+    return g;
+  }
+
+  proc main(): bool = {
+    var b, b';
+    
+    b  <$ {0,1};
+    b' <@ game(b);
+
+    return b = b';
+  }
+}.
+
+section HashFunctionSecurity.
+  (* Losslessness *)
+  lemma ho1_init_ll (H<: HashFunction) (D<: HDist):
+    islossless HO1(H).init
+  by proc; skip; progress.
+
+  lemma ho1_o_ll (H<: HashFunction) (D<: HDist):
+    islossless H.hash =>
+    islossless HO1(H).o
+  by move => Hhash_ll; proc; call Hhash_ll; skip; progress; trivial.
+
+  lemma ho2_init_ll (H<: HashFunction) (D<: HDist):
+    islossless HO2(H).init
+  by proc; skip; progress.
+
+  lemma ho2_o_ll (H<: HashFunction) (D<: HDist):
+    islossless H.hash =>
+    islossless HO2(H).o
+  by move => Hhash_ll; proc; call Hhash_ll; skip; progress; trivial.
+
+  lemma hashexp_game_ll (H1<: HashFunction) (H2<: HashFunction) (D<: HDist):
+    islossless D(HO1(H1)).distinguish => (* implies that if HO1.o is called, it also terminates *)
+    islossless D(HO2(H2)).distinguish =>
+    islossless HashExp(H1, H2, D).game.
+  proof.
+    move => Ddistinguish1_ll Ddistinguish2_ll.
+    have ho1_init_ll: islossless HO1(H1).init by apply (ho1_init_ll H1 D).
+    have ho2_init_ll: islossless HO2(H2).init by apply (ho2_init_ll H2 D).
+    proc => //.
+    if => //.
+      (* real *)
+      call Ddistinguish1_ll; call ho1_init_ll; wp; skip; trivial.
+      (* !real *)
+      call Ddistinguish2_ll; call ho2_init_ll; wp; skip; trivial.
+  qed.
+
+  lemma hashexp_main_ll (H1<: HashFunction) (H2<: HashFunction) (D<: HDist):
+    islossless D(HO1(H1)).distinguish => (* implies that if HO1.o is called, it also terminates *)
+    islossless D(HO2(H2)).distinguish =>
+    islossless HashExp(H1, H2, D).main.
+  proof.
+    move => Ddistinguish1_ll Ddistinguish2_ll.
+    have game_ll: islossless HashExp(H1, H2, D).game by apply (hashexp_game_ll H1 H2 D).
+    proc; call game_ll; rnd; skip; progress; apply (dboolE predT).
+  qed.
+
+  lemma ind_main_ll (O<: Oracle) (D<: HDist):
+    islossless O.init =>
+    islossless D(O).distinguish =>
+    islossless IND(O, D).main.
+  proof.
+    move => Oinit_ll Ddistinguish1_ll; proc.
+    call Ddistinguish1_ll; call Oinit_ll; skip; trivial.
+  qed.
+
+  (* We show that the previous is just some identical rewriting of IND; we do this through the definition of the advantage *)
+  (*
+    * Total probability
+    * Pr[Main] = 1/2 Pr[Real] + 1/2 Pr[Ideal]
+    *)
+  lemma hashexp_total_probability (H1<: HashFunction{HashExp}) (H2<: HashFunction{HashExp,H1}) (D<: HDist{HashExp,H1, H2}) &m:
+    Pr[HashExp(H1, H2, D).main() @ &m : res] = 1%r/2%r * (Pr[HashExp(H1, H2, D).game(true) @ &m : res] + Pr[HashExp(H1, H2, D).game(false) @ &m : !res]).
+  proof.
+    pose prReal := Pr[HashExp(H1, H2, D).game(true) @ &m : res].
+    pose prIdeal := Pr[HashExp(H1, H2, D).game(false) @ &m : !res].
+    byphoare (_: (glob D, glob H1, glob H2, glob HashExp) = (glob D, glob H1, glob H2, glob HashExp){m} ==> _) => //; proc => //.
+    seq 1: (b) (1%r/2%r) prReal (1%r/2%r) prIdeal ((glob D, glob H1, glob H2, glob HashExp) = (glob D, glob H1, glob H2, glob HashExp){m}).
+      rnd; wp; skip; smt.
+      (* post = b *)
+      rnd; wp; skip; smt.
+      rewrite /prReal.
+        (* b *)
+        call (_: (glob D, glob H1, glob H2, glob HashExp) = (glob D, glob H1, glob H2, glob HashExp){m} /\ real ==> res) => //; last by skip; progress; smt.
+        bypr; progress; byequiv => //; sim; progress; by rewrite H4.
+      (* post = !b *)
+      rnd; wp; skip; smt.
+      rewrite /prIdeal.
+        (* !b *)
+        call (_: (glob D, glob H1, glob H2, glob HashExp) = (glob D, glob H1, glob H2, glob HashExp){m} /\ !real ==> !res) => //; last by skip; progress; smt.
+        bypr; progress; byequiv => //; sim; progress; by rewrite H4.
+    progress; smt.
+  qed.
+
+  (*
+  *  Advantage: |2*Pr[Main] - 1| = Pr[Real] - Pr[!Ideal]
+  *)
+  lemma hashexp_advantage (H1<: HashFunction{HashExp}) (H2<: HashFunction{HashExp,H1}) (D<: HDist{HashExp,H1,H2}) &m:
+    islossless D(HO1(H1)).distinguish => (* implies that if O1.f is called, it also terminates *)
+    islossless D(HO2(H2)).distinguish =>
+    2%r * Pr[HashExp(H1, H2, D).main() @ &m : res] - 1%r =
+    Pr[HashExp(H1, H2, D).game(true) @ &m : res] - Pr[HashExp(H1, H2, D).game(false) @ &m : res].
+  proof.
+    move => Ddistinguish1_ll Ddistinguish2_ll.
+    pose prReal := Pr[HashExp(H1, H2, D).game(true) @ &m : res].
+    have ->: Pr[HashExp(H1, H2, D).game(false) @ &m : res] = 1%r - Pr[HashExp(H1, H2, D).game(false) @ &m : !res].
+      rewrite Pr [mu_not].
+      have ->: Pr[HashExp(H1, H2, D).game(false) @ &m : true] = 1%r.
+        byphoare => //; apply (hashexp_game_ll H1 H2 D) => //.
+      smt.
+    pose prIdeal := Pr[HashExp(H1, H2, D).game(false) @ &m : !res].
+    have ->: (2%r * Pr[HashExp(H1, H2, D).main() @ &m : res] - 1%r = prReal - (1%r - prIdeal)) = (Pr[HashExp(H1, H2, D).main() @ &m : res] = 1%r/2%r * (prReal + prIdeal)) by smt.
+    apply (hashexp_total_probability H1 H2 D &m).
+  qed.
+
+  local lemma hashexp_real_ind1_eq (H1<: HashFunction{HashExp}) (H2<: HashFunction{HashExp,H1}) (D<: HDist{HashExp,H1, H2}) &m:
+    Pr[HashExp(H1, H2, D).game(true) @ &m : res] = Pr[IND(HO1(H1), D).main() @ &m : res].
+  proof.
+    byequiv => //; proc.
+    rcondt{1} 1; first by progress.
+    sim.
+  qed.
+
+  local lemma hashexp_ideal_ind2_eq (H1<: HashFunction{HashExp}) (H2<: HashFunction{HashExp,H1}) (D<: HDist{HashExp,H1, H2}) &m:
+    Pr[HashExp(H1, H2, D).game(false) @ &m : res] = Pr[IND(HO2(H2), D).main() @ &m : res].
+  proof.
+    byequiv => //; proc.
+    rcondf{1} 1; first by progress.
+    sim.
+  qed.
+
+  lemma hashexp_advantage_ind (H1<: HashFunction{HashExp}) (H2<: HashFunction{HashExp,H1}) (D<: HDist{HashExp,H1, H2}) &m:
+    islossless D(HO1(H1)).distinguish =>
+    islossless D(HO2(H2)).distinguish =>
+    2%r * Pr[HashExp(H1, H2, D).main() @ &m : res] - 1%r =
+    Pr[IND(HO1(H1), D).main() @ &m : res] - Pr[IND(HO2(H2), D).main() @ &m : res].
+  proof.
+    move => Ddistinguish1_ll Ddistinguish2_ll.
+    have ind2_main_ll: islossless IND(HO2(H2), D).main by apply (ind_main_ll (HO2(H2)) D) => //; apply (ho2_init_ll H2 D) => //.
+    rewrite - (hashexp_real_ind1_eq H1 H2 D &m).
+    rewrite - (hashexp_ideal_ind2_eq H1 H2 D &m).
+    apply (hashexp_advantage H1 H2 D &m) => //.
+  qed.
+
+  lemma hashexp_advantage_ind_alt (H1<: HashFunction{HashExp}) (H2<: HashFunction{HashExp,H1}) (D<: HDist{HashExp,H1, H2}) negligible &m:
+    islossless D(HO1(H1)).distinguish =>
+    islossless D(HO2(H2)).distinguish =>
+    Pr[IND(HO1(H1), D).main() @ &m : res] - Pr[IND(HO2(H2), D).main() @ &m : res] <= negligible =>
+    Pr[HashExp(H1, H2, D).main() @ &m : res] <= inv 2%r + inv 2%r * negligible.
+  proof.
+    move => Ddistinguish1_ll Ddistinguish2_ll.
+    have ind2_main_ll: islossless IND(HO2(H2), D).main by apply (ind_main_ll (HO2(H2)) D) => //; apply (ho2_init_ll H2 D) => //.
+    pose prM := Pr[HashExp(H1, H2, D).main() @ &m : res];
+    pose prR := Pr[IND(HO1(H1), D).main() @ &m : res];
+    pose prI := Pr[IND(HO2(H2), D).main() @ &m : res].
+    move => PRFassumption.
+    have ->: prM <= inv 2%r + inv 2%r * negligible <=> 2%r * prM - 1%r <= negligible by split; smt.
+    rewrite (hashexp_advantage_ind H1 H2 D &m) => //.
+  qed.
+
+end section HashFunctionSecurity.
+
+print hash_probability_collision.
+print hashexp_advantage_ind_alt.

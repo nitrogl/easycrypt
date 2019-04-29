@@ -1,0 +1,647 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2017--2018 - Roberto Metere <r.metere2@ncl.ac.uk>
+ *
+ * Distributed under the terms of the CeCILL-B-V1 license
+ * -------------------------------------------------------------------- *)
+
+(*** (Unnecessary) stuff about pseudo-random permutations **)
+require import DBool.
+require import Int.
+require import IntExtra.
+require import Real.
+require import List.
+require import ListExt.
+require import Distr.
+require import Dexcepted.
+require import SmtMap.
+require import FSet.
+require import TacticsExt.
+require import SmtMapExt.
+
+require (* -- *) IdealPRF.
+require (* -- *) StrongPRP.
+require (* -- *) IdealPRP.
+
+type K.
+type D.
+
+op dK: { K distr | is_lossless dK } as dKey_ll.
+op dD: D distr.
+
+(* Bound to polynomial calls *)
+op q : { int | 0 <= q } as q_ge0.
+
+clone import StrongPRP as SPRP with
+  type K <- K,
+  type D <- D,
+
+  op dK <- dK
+
+rename "StrongPRP_Distinguisher" as "SPRPDist"
+rename "StrongPRP_Oracles" as "SPRPOracleAccess"
+rename "StrongPRP_IND" as "IndSPRP"
+rename "StrongPRP_Wrap" as "SPRPO"
+rename "StrongPRP" as "PRPOracle".
+
+clone import IdealPRP as SPRPi with
+  type K <- K,
+  type D <- D,
+
+  op dK <- dK,
+  op dD <- dD
+rename "RandomPermutation" as "RP"
+rename "StrongPRP_IND" as "IndSPRP".
+
+theory PRPOracle.
+  module PRPO = SPRPO.
+end PRPOracle.
+
+(* Instantiate one oracle for each PRP to compare *)
+clone import PRPOracle as PRPO1
+rename "PRPO" as "PRPO1".
+clone import PRPOracle as PRPO2
+rename "PRPO" as "PRPO2".
+
+(*
+ * In the experiment, we do not bound the distinguisher calls since
+ * P1 and P2 may be indistinguishable even without.
+ *)
+module PRPExp(P1: PRP, P2: PRP, D: SPRPDist) = {
+  proc game(real: bool) : bool = {
+    var g;
+
+    if (real) {
+      PRPO1(P1).init();
+      g <@ D(PRPO1(P1)).distinguish();
+    } else {
+      PRPO2(P2).init();
+      g <@ D(PRPO2(P2)).distinguish();
+    }
+
+    return g;
+  }
+
+  proc main(): bool = {
+    var b, b';
+    
+    b  <$ {0,1};
+    b' <@ game(b);
+
+    return b = b';
+  }
+}.
+
+(*
+ * Strong security.
+ * We will be showing that RP (see above) and RFP (see below) are
+ * indistinguishable up to q^2/maxpr, where maxpr is the highest probability of sampling
+ *)
+require (*--*) Strong_RP_RF.
+clone import Strong_RP_RF as SRPRF with
+  op q = q, (* outside of EC, we assume that q is a polynomial bound *)
+  type K <- K,
+  type D <- D,
+
+  op dK <- dK,
+  op uD <- dD
+rename "DBounder" as "FOracleCallsCounter" (* Count the calls to the oracle *)
+rename "ARP" as "RFP" (* This is a random function augmented with the inverse function (and oracle) *)
+.
+
+(*
+ * In the experiment, we do not bound the distinguisher calls since
+ * P1 and P2 may be indistinguishable even without.
+ *)
+module PRPExpO(O1: PRPOracle, O2: PRPOracle, D: SPRPDist) = {
+  proc game(real: bool) : bool = {
+    var g;
+
+    if (real) {
+      g <@ IndSPRP(O1, D).main();
+    } else {
+      g <@ IndSPRP(O2, D).main();
+    }
+
+    return g;
+  }
+
+  proc main(): bool = {
+    var b, b';
+    
+    b  <$ {0,1};
+    b' <@ game(b);
+
+    return b = b';
+  }
+}.
+
+section PRPSecurity.
+  (* Losslessness *)
+  lemma prpo1_init_ll (P<: PRP) (D<: SPRPDist):
+    islossless P.keygen =>
+    islossless PRPO1(P).init
+  by move => Pkeygen_ll; proc; call Pkeygen_ll; skip; progress.
+
+  lemma prpo1_f_ll (P<: PRP) (D<: SPRPDist):
+    islossless P.f =>
+    islossless PRPO1(P).f
+  by move => Pf_ll; proc; call Pf_ll; skip; progress; trivial.
+
+  lemma prpo2_init_ll (P<: PRP) (D<: SPRPDist):
+    islossless P.keygen =>
+    islossless PRPO2(P).init
+  by move => Pkeygen_ll; proc; call Pkeygen_ll; skip; progress.
+
+  lemma prpo2_f_ll (P<: PRP) (D<: SPRPDist):
+    islossless P.f =>
+    islossless PRPO2(P).f
+  by move => Pf_ll; proc; call Pf_ll; skip; progress; trivial.
+
+  lemma prpexp_game_ll (P1<: PRP) (P2<: PRP) (D<: SPRPDist):
+    islossless P1.keygen =>
+    islossless P2.keygen =>
+    islossless D(PRPO1(P1)).distinguish => (* implies that if PRPO1.f is called, it also terminates *)
+    islossless D(PRPO2(P2)).distinguish =>
+    islossless PRPExp(P1, P2, D).game.
+  proof.
+    move => P1keygen_ll P2keygen_ll Ddistinguish1_ll Ddistinguish2_ll.
+    have o1_init_ll: islossless PRPO1(P1).init by apply (prpo1_init_ll P1 D).
+    have o2_init_ll: islossless PRPO2(P2).init by apply (prpo2_init_ll P2 D).
+    proc => //.
+    if => //.
+      (* real *)
+      call Ddistinguish1_ll; call o1_init_ll; wp; skip; trivial.
+      (* !real *)
+      call Ddistinguish2_ll; call o2_init_ll; wp; skip; trivial.
+  qed.
+
+  lemma prpexp_main_ll (P1<: PRP) (P2<: PRP) (D<: SPRPDist):
+    islossless P1.keygen =>
+    islossless P2.keygen =>
+    islossless D(PRPO1(P1)).distinguish => (* implies that if PRPO1.f is called, it also terminates *)
+    islossless D(PRPO2(P2)).distinguish =>
+    islossless PRPExp(P1, P2, D).main.
+  proof.
+    move => P1keygen_ll P2keygen_ll Ddistinguish1_ll Ddistinguish2_ll.
+    have game_ll: islossless PRPExp(P1, P2, D).game by apply (prpexp_game_ll P1 P2 D).
+    proc; call game_ll; rnd; skip; progress; apply (dboolE predT).
+  qed.
+
+  lemma prpind_main_ll (O<: PRPOracle) (D<: SPRPDist):
+    islossless O.init =>
+    islossless D(O).distinguish =>
+    islossless IndSPRP(O, D).main.
+  proof.
+    move => Oinit_ll Ddistinguish1_ll; proc.
+    call Ddistinguish1_ll; call Oinit_ll; skip; trivial.
+  qed.
+
+  (* We show that the previous is just some identical rewriting of IND; we do this through the definition of the advantage *)
+  (*
+   * Total probability
+   * Pr[Main] = 1/2 Pr[Real] + 1/2 Pr[!Ideal]
+   *)
+  lemma prpexp_total_probability (P1<: PRP{PRPO1}) (P2<: PRP{PRPO2}) (D<: SPRPDist{P1, P2, PRPO1, PRPO2}) &m:
+    Pr[PRPExp(P1, P2, D).main() @ &m : res] = 1%r/2%r * (Pr[PRPExp(P1, P2, D).game(true) @ &m : res] + Pr[PRPExp(P1, P2, D).game(false) @ &m : !res]).
+  proof.
+    pose prReal := Pr[PRPExp(P1, P2, D).game(true) @ &m : res].
+    pose prIdeal := Pr[PRPExp(P1, P2, D).game(false) @ &m : !res].
+    byphoare (_: (glob D, glob P1, glob P2, glob PRPO1, glob PRPO2) = (glob D, glob P1, glob P2, glob PRPO1, glob PRPO2){m} ==> _) => //; proc => //.
+    seq 1: (b) (1%r/2%r) prReal (1%r/2%r) prIdeal ((glob D, glob P1, glob P2, glob PRPO1, glob PRPO2) = (glob D, glob P1, glob P2, glob PRPO1, glob PRPO2){m}).
+      rnd; wp; skip; smt.
+      (* post = b *)
+      rnd; wp; skip; smt.
+      rewrite /prReal.
+        (* b *)
+        call (_: (glob D, glob P1, glob PRPO1) = (glob D, glob P1, glob PRPO1){m} /\ real ==> res) => //; last by skip; progress; smt.
+        bypr; progress; rewrite H2.
+        byequiv (_: ={real, glob D, glob P1, glob PRPO1} /\ real{1} ==> _) => //; proc; rcondt{1} 1 => //; rcondt{2} 1 => //; sim. 
+      (* post = !b *)
+      rnd; wp; skip; smt.
+      rewrite /prIdeal.
+        (* !b *)
+        call (_: (glob D, glob P2, glob PRPO2) = (glob D, glob P2, glob PRPO2){m} /\ !real ==> !res) => //; last by skip; progress; smt.
+        bypr; progress. rewrite H2.
+        byequiv (_: ={real, glob D, glob P2, glob PRPO2} /\ !real{1} ==> _) => //; proc; rcondf{1} 1 => //; rcondf{2} 1 => //; sim.
+    progress; smt.
+  qed.
+
+  (*
+  *  Advantage: |2*Pr[Main] - 1| = Pr[Real] - Pr[Ideal]
+  *)
+  lemma prpexp_advantage (P1<: PRP{PRPO1}) (P2<: PRP{PRPO2}) (D<: SPRPDist{P1, P2, PRPO1, PRPO2}) &m:
+    islossless P1.keygen =>
+    islossless P2.keygen =>
+    islossless D(PRPO1(P1)).distinguish => (* implies that if PRPO1.f is called, it also terminates *)
+    islossless D(PRPO2(P2)).distinguish =>
+    2%r * Pr[PRPExp(P1, P2, D).main() @ &m : res] - 1%r =
+    Pr[PRPExp(P1, P2, D).game(true) @ &m : res] - Pr[PRPExp(P1, P2, D).game(false) @ &m : res].
+  proof.
+    move => P1keygen_ll P2keygen_ll Ddistinguish1_ll Ddistinguish2_ll.
+    pose prReal := Pr[PRPExp(P1, P2, D).game(true) @ &m : res].
+    have ->: Pr[PRPExp(P1, P2, D).game(false) @ &m : res] = 1%r - Pr[PRPExp(P1, P2, D).game(false) @ &m : !res].
+      rewrite Pr [mu_not].
+      have ->: Pr[PRPExp(P1, P2, D).game(false) @ &m : true] = 1%r.
+        byphoare => //; apply (prpexp_game_ll P1 P2 D) => //.
+      smt.
+    pose prIdeal := Pr[PRPExp(P1, P2, D).game(false) @ &m : !res].
+    pose prMain := Pr[PRPExp(P1, P2, D).main() @ &m : res].
+    have ->: (2%r * prMain - 1%r = prReal - (1%r - prIdeal)) = (2%r * prMain = prReal - (1%r - prIdeal) + 1%r) by smt.
+    have ->: (2%r * prMain = prReal - (1%r - prIdeal) + 1%r) = (2%r * prMain = prReal - 1%r + prIdeal + 1%r) by smt.
+    have ->: (2%r * prMain = prReal - 1%r + prIdeal + 1%r) = (2%r * prMain = prReal + prIdeal) by smt.
+    have eqmul: forall a b, a = b <=> a * inv 2%r = b * inv 2%r by (have half0: inv 2%r <> 0%r by smt); smt.
+    have ->: (2%r * prMain = prReal + prIdeal) = (2%r * prMain * inv 2%r = (prReal + prIdeal) * inv 2%r) by rewrite eqmul //.
+    have ->: (2%r * prMain / 2%r = (prReal + prIdeal) / 2%r) = (prMain = (prReal + prIdeal) * inv 2%r) by smt.
+    apply (prpexp_total_probability P1 P2 D &m).
+  qed.
+
+  local lemma prpexp_real_ind1_eq (P1<: PRP{PRPO1}) (P2<: PRP) (D<: SPRPDist{P1, P2, PRPO1}) &m:
+    Pr[PRPExp(P1, P2, D).game(true) @ &m : res] = Pr[IndSPRP(PRPO1(P1), D).main() @ &m : res].
+  proof.
+    byequiv => //; proc.
+    rcondt{1} 1; first by progress.
+    sim.
+  qed.
+
+  local lemma prpexp_ideal_ind2_eq (P1<: PRP) (P2<: PRP{PRPO2}) (D<: SPRPDist{P1, P2, PRPO2}) &m:
+    Pr[PRPExp(P1, P2, D).game(false) @ &m : res] = Pr[IndSPRP(PRPO2(P2), D).main() @ &m : res].
+  proof.
+    byequiv => //; proc.
+    rcondf{1} 1; first by progress.
+    sim.
+  qed.
+
+  lemma prpexp_advantage_ind (P1<: PRP{PRPO1}) (P2<: PRP{PRPO2}) (D<: SPRPDist{P1, P2, PRPO1, PRPO2}) &m:
+    islossless P1.keygen =>
+    islossless P2.keygen =>
+    islossless D(PRPO1(P1)).distinguish =>
+    islossless D(PRPO2(P2)).distinguish =>
+    2%r * Pr[PRPExp(P1, P2, D).main() @ &m : res] - 1%r =
+    Pr[IndSPRP(PRPO1(P1), D).main() @ &m : res] - Pr[IndSPRP(PRPO2(P2), D).main() @ &m : res].
+  proof.
+    move => P1keygen_ll P2keygen_ll Ddistinguish1_ll Ddistinguish2_ll.
+    have ind2_main_ll: islossless IndSPRP(PRPO2(P2), D).main by apply (prpind_main_ll (PRPO2(P2)) D) => //; apply (prpo2_init_ll P2 D) => //.
+    rewrite - (prpexp_real_ind1_eq P1 P2 D &m).
+    rewrite - (prpexp_ideal_ind2_eq P1 P2 D &m).
+    apply (prpexp_advantage P1 P2 D &m) => //.
+  qed.
+
+  lemma prpexp_advantage_ind_alt (P1<: PRP{PRPO1}) (P2<: PRP{PRPO2}) (D<: SPRPDist{P1, P2, PRPO1, PRPO2}) negligible &m:
+    islossless P1.keygen =>
+    islossless P2.keygen =>
+    islossless D(PRPO1(P1)).distinguish =>
+    islossless D(PRPO2(P2)).distinguish =>
+    Pr[IndSPRP(PRPO1(P1), D).main() @ &m : res] - Pr[IndSPRP(PRPO2(P2), D).main() @ &m : res] = negligible =>
+    Pr[PRPExp(P1, P2, D).main() @ &m : res] = inv 2%r + inv 2%r * negligible.
+  proof.
+    move => P1keygen_ll P2keygen_ll Ddistinguish1_ll Ddistinguish2_ll.
+    have ind2_main_ll: islossless IndSPRP(PRPO2(P2), D).main by apply (prpind_main_ll (PRPO2(P2)) D) => //; apply (prpo2_init_ll P2 D) => //.
+    pose prM := Pr[PRPExp(P1, P2, D).main() @ &m : res];
+    pose prR := Pr[IndSPRP(PRPO1(P1), D).main() @ &m : res];
+    pose prI := Pr[IndSPRP(PRPO2(P2), D).main() @ &m : res].
+    move => PRPassumption.
+    have ->: prM = inv 2%r + inv 2%r * negligible <=> 2%r * prM - 1%r = negligible by split; smt.
+    rewrite (prpexp_advantage_ind P1 P2 D &m) => //.
+  qed.
+
+  (* Indistinguishability between PRF (augmented with the inverse function) and PRP is up to birthday *)
+  lemma prp_polybound_ind_eq (P<: PRP{SPRPO,FOracleCallsCounter}) (D<: SPRPDist{P,SPRPO,FOracleCallsCounter}) &m:
+    Pr[IndSPRP(SPRPO(P), FOracleCallsCounter(D)).main() @ &m : res] = Pr[PRPt.IND(SPRPO(P), FOracleCallsCounter(D)).main() @ &m : res] by byequiv (_: ={glob FOracleCallsCounter, glob P, glob D} ==> _) => //; proc; sim.
+
+  lemma prp_polybound_randomperm_ind_eq (D<: SPRPDist{RP,SPRPO,PRPi.PRPi,FOracleCallsCounter}) &m:
+    Pr[IndSPRP(RP, FOracleCallsCounter(D)).main() @ &m : res] = Pr[PRPt.IND(PRPi.PRPi, FOracleCallsCounter(D)).main() @ &m : res] by byequiv (_: ={glob FOracleCallsCounter, glob SPRPO, glob D} ==> _) => //; proc; sim.
+
+  lemma prp_polybound_almost_randomperm_ind_eq (D<: SPRPDist{SPRPO,RFP,FOracleCallsCounter}) &m:
+    Pr[IndSPRP(RFP, FOracleCallsCounter(D)).main() @ &m : res] = Pr[PRPt.IND(RFP, FOracleCallsCounter(D)).main() @ &m : res] by byequiv (_: ={glob FOracleCallsCounter, glob SPRPO, glob D} ==> _) => //; proc; sim.
+
+  lemma prp_polybound_randomperm (D<: SPRPDist{RP,SPRPO,RFP,PRPi.PRPi,FOracleCallsCounter}) &m:
+    (forall (O<: PRPt.Oracles{D}), islossless O.f => islossless O.fi => islossless D(O).distinguish) =>
+    `| Pr[IndSPRP(RP, FOracleCallsCounter(D)).main() @ &m : res] - Pr[IndSPRP(RFP, FOracleCallsCounter(D)).main() @ &m : res] | <= (q^2)%r * mu1 dD witness.
+  proof.
+    move => Ddistinguish_ll; rewrite (prp_polybound_randomperm_ind_eq D &m) (prp_polybound_almost_randomperm_ind_eq D &m);
+    apply (SRPRF.Conclusion D &m) => //.
+  qed.
+
+  (* Security of the experiment given the oracles directly *)
+  (* Losslessness *)
+  lemma prpexpo_game_ll (O1<: PRPOracle) (O2<: PRPOracle) (D<: SPRPDist):
+    islossless O1.init =>
+    islossless O2.init =>
+    islossless D(O1).distinguish =>
+    islossless D(O2).distinguish =>
+    islossless PRPExpO(O1, O2, D).game.
+  proof.
+    move => O1init_ll O2init_ll Ddistinguish1_ll Ddistinguish2_ll.
+    proc; inline*.
+    if => //.
+      (* real *)
+      wp; call Ddistinguish1_ll; call O1init_ll; wp; skip; trivial.
+      (* !real *)
+      wp; call Ddistinguish2_ll; call O2init_ll; wp; skip; trivial.
+  qed.
+
+  lemma prpexpo_main_ll (O1<: PRPOracle) (O2<: PRPOracle) (D<: SPRPDist):
+    islossless O1.init =>
+    islossless O2.init =>
+    islossless D(O1).distinguish =>
+    islossless D(O2).distinguish =>
+    islossless PRPExpO(O1, O2, D).main.
+  proof.
+    move => O1init_ll O2init_ll Ddistinguish1_ll Ddistinguish2_ll.
+    have game_ll: islossless PRPExpO(O1, O2, D).game by apply (prpexpo_game_ll O1 O2 D).
+    proc; call game_ll; rnd; skip; progress; apply (dboolE predT).
+  qed.
+
+  (* We show that the previous is just some identical rewriting of IND; we do this through the definition of the advantage *)
+  (*
+   * Total probability
+   * Pr[Main] = 1/2 Pr[Real] + 1/2 Pr[!Ideal]
+   *)
+  lemma prpexpo_total_probability (O1<: PRPOracle) (O2<: PRPOracle) (D<: SPRPDist{O1,O2}) &m:
+    Pr[PRPExpO(O1, O2, D).main() @ &m : res] = 1%r/2%r * (Pr[PRPExpO(O1, O2, D).game(true) @ &m : res] + Pr[PRPExpO(O1, O2, D).game(false) @ &m : !res]).
+  proof.
+    pose prReal := Pr[PRPExpO(O1, O2, D).game(true) @ &m : res].
+    pose prIdeal := Pr[PRPExpO(O1, O2, D).game(false) @ &m : !res].
+    byphoare (_: (glob D, glob O1, glob O2) = (glob D, glob O1, glob O2){m} ==> _) => //; proc => //.
+    seq 1: (b) (1%r/2%r) prReal (1%r/2%r) prIdeal ((glob D, glob O1, glob O2) = (glob D, glob O1, glob O2){m}).
+      rnd; wp; skip; smt.
+      (* post = b *)
+      rnd; wp; skip; smt.
+      rewrite /prReal.
+        (* b *)
+        call (_: (glob D, glob O1) = (glob D, glob O1){m} /\ real ==> res) => //; last by skip; progress; smt.
+        bypr; progress; rewrite H1.
+        byequiv (_: ={real, glob D, glob O1} /\ real{1} ==> _) => //; proc; rcondt{1} 1 => //; rcondt{2} 1 => //; sim.     (* post = !b *)
+      rnd; wp; skip; smt.
+      rewrite /prIdeal.
+        (* !b *)
+        call (_: (glob D, glob O2) = (glob D, glob O2){m} /\ !real ==> !res) => //; last by skip; progress; smt.
+        bypr; progress; rewrite H1.
+        byequiv (_: ={real, glob D, glob O2} /\ !real{1} ==> _) => //; proc; rcondf{1} 1 => //; rcondf{2} 1 => //; sim.
+    progress; smt.
+  qed.
+
+  (*
+  *  Advantage: |2*Pr[Main] - 1| = Pr[Real] - Pr[Ideal]
+  *)
+  lemma prpexpo_advantage (O1<: PRPOracle) (O2<: PRPOracle) (D<: SPRPDist{O1, O2}) &m:
+    islossless O1.init =>
+    islossless O2.init =>
+    islossless D(O1).distinguish =>
+    islossless D(O2).distinguish =>
+    2%r * Pr[PRPExpO(O1, O2, D).main() @ &m : res] - 1%r =
+    Pr[PRPExpO(O1, O2, D).game(true) @ &m : res] - Pr[PRPExpO(O1, O2, D).game(false) @ &m : res].
+  proof.
+    move => O1init_ll O2init_ll Ddistinguish1_ll Ddistinguish2_ll.
+    pose prReal := Pr[PRPExpO(O1, O2, D).game(true) @ &m : res].
+    have ->: Pr[PRPExpO(O1, O2, D).game(false) @ &m : res] = 1%r - Pr[PRPExpO(O1, O2, D).game(false) @ &m : !res].
+      rewrite Pr [mu_not].
+      have ->: Pr[PRPExpO(O1, O2, D).game(false) @ &m : true] = 1%r.
+        byphoare => //; apply (prpexpo_game_ll O1 O2 D) => //.
+      smt.
+    pose prIdeal := Pr[PRPExpO(O1, O2, D).game(false) @ &m : !res].
+    pose prMain := Pr[PRPExpO(O1, O2, D).main() @ &m : res].
+    have ->: (2%r * prMain - 1%r = prReal - (1%r - prIdeal)) = (2%r * prMain = prReal - (1%r - prIdeal) + 1%r) by smt.
+    have ->: (2%r * prMain = prReal - (1%r - prIdeal) + 1%r) = (2%r * prMain = prReal - 1%r + prIdeal + 1%r) by smt.
+    have ->: (2%r * prMain = prReal - 1%r + prIdeal + 1%r) = (2%r * prMain = prReal + prIdeal) by smt.
+    have eqmul: forall a b, a = b <=> a * inv 2%r = b * inv 2%r by (have half0: inv 2%r <> 0%r by smt); smt.
+    have ->: (2%r * prMain = prReal + prIdeal) = (2%r * prMain * inv 2%r = (prReal + prIdeal) * inv 2%r) by rewrite eqmul //.
+    have ->: (2%r * prMain / 2%r = (prReal + prIdeal) / 2%r) = (prMain = (prReal + prIdeal) * inv 2%r) by smt.
+    apply (prpexpo_total_probability O1 O2 D &m).
+  qed.
+
+  local lemma prpexpo_real_ind1_eq (O1<: PRPOracle) (O2<: PRPOracle) (D<: SPRPDist{O1, O2}) &m:
+    Pr[PRPExpO(O1, O2, D).game(true) @ &m : res] = Pr[IndSPRP(O1, D).main() @ &m : res].
+  proof.
+    byequiv => //; proc; inline*.
+    rcondt{1} 1; first by progress.
+    sim.
+  qed.
+
+  local lemma prpexpo_ideal_ind2_eq (O1<: PRPOracle) (O2<: PRPOracle) (D<: SPRPDist{O1, O2}) &m:
+    Pr[PRPExpO(O1, O2, D).game(false) @ &m : res] = Pr[IndSPRP(O2, D).main() @ &m : res].
+  proof.
+    byequiv => //; proc; inline*.
+    rcondf{1} 1; first by progress.
+    sim.
+  qed.
+
+  lemma prpexpo_advantage_ind (O1<: PRPOracle{PRPO1}) (O2<: PRPOracle{PRPO2}) (D<: SPRPDist{O1, O2, PRPO1, PRPO2}) &m:
+    islossless O1.init =>
+    islossless O2.init =>
+    islossless D(O1).distinguish =>
+    islossless D(O2).distinguish =>
+    2%r * Pr[PRPExpO(O1, O2, D).main() @ &m : res] - 1%r =
+    Pr[IndSPRP(O1, D).main() @ &m : res] - Pr[IndSPRP(O2, D).main() @ &m : res].
+  proof.
+    move => O1init_ll O2init_ll Ddistinguish1_ll Ddistinguish2_ll.
+    have ind2_main_ll: islossless IndSPRP(O2, D).main by apply (prpind_main_ll O2 D) => //; apply (prpo2_init_ll P2 D) => //.
+    rewrite - (prpexpo_real_ind1_eq O1 O2 D &m).
+    rewrite - (prpexpo_ideal_ind2_eq O1 O2 D &m).
+    apply (prpexpo_advantage O1 O2 D &m) => //.
+  qed.
+
+  lemma prpexpo_advantage_ind_alt (O1<: PRPOracle{SPRPO}) (O2<: PRPOracle{SPRPO}) (D<: SPRPDist{O1, O2, SPRPO}) negligible &m:
+    islossless O1.init =>
+    islossless O2.init =>
+    islossless D(O1).distinguish =>
+    islossless D(O2).distinguish =>
+    Pr[IndSPRP(O1, D).main() @ &m : res] - Pr[IndSPRP(O2, D).main() @ &m : res] = negligible =>
+    Pr[PRPExpO(O1, O2, D).main() @ &m : res] = inv 2%r + inv 2%r * negligible.
+  proof.
+    move => O1init_ll O2init_ll Ddistinguish1_ll Ddistinguish2_ll.
+    have ind2_main_ll: islossless IndSPRP(O2, D).main by apply (prpind_main_ll O2 D) => //; apply (prpo2_init_ll P2 D) => //.
+    pose prM := Pr[PRPExpO(O1, O2, D).main() @ &m : res];
+    pose prR := Pr[IndSPRP(O1, D).main() @ &m : res];
+    pose prI := Pr[IndSPRP(O2, D).main() @ &m : res].
+    move => PRPassumption.
+    have ->: prM = inv 2%r + inv 2%r * negligible <=> 2%r * prM - 1%r = negligible by split; smt.
+    rewrite (prpexpo_advantage_ind O1 O2 D &m) => //.
+  qed.
+
+  lemma prpexpo_polybound_randomperm (D<: SPRPDist{RP,SPRPO,RFP,PRPi.PRPi,FOracleCallsCounter}) &m:
+    (forall (O<: SPRPOracleAccess{D}), islossless O.f => islossless O.fi => islossless D(O).distinguish) =>
+    `| Pr[IndSPRP(RP, FOracleCallsCounter(D)).main() @ &m : res] - Pr[IndSPRP(RFP, FOracleCallsCounter(D)).main() @ &m : res] | <= (q^2)%r * mu1 dD witness.
+  proof.
+    move => Ddistinguish_ll; rewrite (prp_polybound_randomperm_ind_eq D &m) (prp_polybound_almost_randomperm_ind_eq D &m).
+    apply (Conclusion D &m) => //.
+    move => *.
+    apply (Ddistinguish_ll O) => //.
+  qed.
+
+  (*
+   * For eventual convenience, we rewrite the distinguishability conclusion
+   * between RP and RF in terms of the experiment PRFExpO
+   *)
+  lemma prpexpo_advantage_ind_rp_rfp (D<: SPRPDist{RP,RFP,SPRPO,FOracleCallsCounter}) &m:
+    islossless FOracleCallsCounter(D, RP).distinguish =>
+    islossless FOracleCallsCounter(D, RFP).distinguish =>
+     2%r * Pr[PRPExpO(RP, RFP, FOracleCallsCounter(D)).main() @ &m : res] - 1%r = (Pr[IndSPRP(RP, FOracleCallsCounter(D)).main() @ &m : res] - Pr[IndSPRP(RFP, FOracleCallsCounter(D)).main() @ &m : res]).
+  proof.
+   apply (prpexpo_advantage_ind RP RFP (FOracleCallsCounter(D)) &m); first 2 by proc; wp; skip; progress.
+  qed.
+
+  lemma prpexpo_ind_eq (D<: SPRPDist{RP,RFP,PRPi.PRPi,SPRPO,FOracleCallsCounter}) &m:
+    (forall (O<: SPRPOracleAccess{D}), islossless O.f => islossless O.fi => islossless D(O).distinguish) =>
+    Pr[PRPExpO(RP, RFP, FOracleCallsCounter(D)).main() @ &m : res] <= inv 2%r + (q^2)%r * mu1 dD witness / 2%r.
+  proof.
+    move => *.
+    have co_RP_ll: islossless FOracleCallsCounter(D, RP).distinguish.
+      proc; call (_: true) => //; first 2 by proc; sp; if => //; wp; call (_: true) => //; if => //; wp; rnd; skip; progress; smt.
+      wp; skip; trivial.
+    have co_RFP_ll: islossless FOracleCallsCounter(D, RFP).distinguish.
+      proc; call (_: true) => //; first 2 by proc; sp; if => //; wp; call (_: true) => //; if => //; wp; rnd; skip; progress; smt.
+      wp; skip; trivial.
+    move : (prpexpo_polybound_randomperm D &m _) => //.
+    rewrite -(prpexpo_advantage_ind_rp_rfp D &m _ _) => //.
+    pose m := Pr[PRPExpO(RP, RFP, FOracleCallsCounter(D)).main() @ &m : res];
+    pose k := (q^2)%r * mu1 dD witness.
+    smt.
+  qed.
+
+  (* We instantiate an ideal random function where D is both the range and the domain *)
+  clone import IdealPRF as PRFi with
+    type K <- K,
+    type D <- D,
+    type R <- D,
+
+    op dK <- dK,
+    op dR <- dD
+  rename "RandomFunction" as "RF" (* RF: D -> D *)
+  rename "PRF_Distinguisher" as "PRFDist"
+  rename "PRF_Oracles" as "PRFOracle"
+  rename "PRF_Oracle" as "PRFOracleAccess"
+  rename "IND" as "IndPRF".
+
+  (*
+   * Now we show that RFP output is indeed behaving as a random function.
+   *)
+  lemma ind_rfp_ind_rf_eq (D<: PRFDist{RF,RFP}) &m:
+    equiv[IndPRF(RFP, D).main ~ IndPRF(RF, D).main : ={glob D} /\ RFP.m{1} = RF.m{2} ==> ={res}].
+  proof.
+    proc; inline*.
+    call (_: RFP.m{1} = RF.m{2}).
+    + proc; inline*; if => //.
+      wp; rnd; skip; progress.
+    + wp; skip; progress.
+  qed.
+
+  (* Keyed random function *)
+  module RandomKeyedPermutation: PRP = {
+    var m:  (K * D, D) fmap
+    var mi: (K * D, D) fmap
+
+    proc init(): unit = {
+      m  <- empty;
+      mi <- empty;
+    }
+
+    proc keygen(): K = {
+      var k;
+
+      k <$ dK;
+
+      return k;
+    }
+
+    proc f(k: K, x: D): D = {
+      var y;
+
+      if (!(dom m (k, x))) {
+        y <$ dD \ (rng m);
+        m.[(k, x)]  <- y;
+        mi.[(k, y)] <- x;
+      }
+
+      return oget m.[(k,x)];
+    }
+
+    proc fi(k: K, y: D): D = {
+      var x;
+
+      if (!(dom mi (k, y))) {
+        x <$ dD \ (rng mi);
+        mi.[(k, y)]  <- x;
+        m.[(k, x)] <- y;
+      }
+
+      return oget mi.[(k,y)];
+    }
+  }.
+
+  module PRPO(P: PRP): PRPOracle = {
+    var k: K
+
+    proc init(): unit = {
+      k <@ P.keygen();
+    }
+
+    proc f(x: D): D = {
+      var y;
+
+      y <@ P.f(k, x);
+
+      return y;
+    }
+
+    proc fi(y: D): D = {
+      var x;
+
+      x <@ P.fi(k, y);
+
+      return x;
+    }
+  }.
+
+  (*
+   * Show that the keyed random permutation and the random permutation are indistinguishable, if
+   *  - the attacker share the same internal state (its global environment) in both memories,
+   *  - both memories are empty (only to enforce prob distro to elements), and
+   *  - the attacker does not have access to the internal of the functions and the oracle (obviously).
+   *)
+  lemma ind_rp_inf_rkp_eq (D<: PRFDist{RP,RandomKeyedPermutation,PRPO}) &m:
+    equiv[IndSPRP(RP, D).main ~ IndSPRP(PRPO(RandomKeyedPermutation), D).main : ={glob D} /\ RP.m{1} = empty /\ RandomKeyedPermutation.m{2} = empty ==> ={res}].
+  proof.
+    proc; inline*.
+    call (_: (forall x, RP.m{1}.[x] = RandomKeyedPermutation.m{2}.[(PRPO.k{2}, x)])
+      /\ rng RP.m{1} = rng RandomKeyedPermutation.m{2}
+      /\ forall kx, RandomKeyedPermutation.m{2}.[kx] <> None => fst kx = PRPO.k{2}).
+    + proc; inline*; sp; wp; if; first by progress; move : (H x{2}); smt.
+      * (* then *)
+        wp; rnd; skip; progress; first 4 by smt.
+        pose m1  := RP.m{1};
+        pose m2  := RandomKeyedPermutation.m{2};
+        pose m1u := m1.[x{2} <- yL];
+        pose m2u := m2.[(PRPO.k{2}, x{2}) <- yL].
+        rewrite rng_frng_eq fsetP; move => y.
+        split.
+        - (* => *)
+          rewrite mem_frng rngE /=.
+          move => [x' img].
+          rewrite mem_frng rngE /=.
+          exists (PRPO.k, x'){2}.
+          rewrite eq_sym -img.
+          case (x' = x{2}) => x_x'.
+          + rewrite x_x' 2!get_set_sameE //.
+          + rewrite get_set_neqE // get_set_neqE // H //.
+        - (* <= *)
+          rewrite mem_frng rngE /=.
+          move => [kx img].
+          have [x' kx_x']: exists x', kx = (PRPO.k, x'){2} by exists (snd kx); smt.
+          rewrite mem_frng rngE /=.
+          exists x'.
+          rewrite eq_sym -img kx_x'.
+          case (x' = x{2}) => x_x'.
+          + rewrite x_x' 2!get_set_sameE //.
+          + rewrite get_set_neqE // get_set_neqE // H //.
+        smt. (* last of the progress call *)
+      * (* else *)
+        skip; progress; smt.
+    + wp; rnd{2}; skip; progress; smt.
+  qed.
+end section PRPSecurity.
+
+print prpexpo_advantage_ind_alt.
+print ind_rp_inf_rkp_eq.
+print prp_polybound_randomperm.
+print prpexpo_ind_eq.
