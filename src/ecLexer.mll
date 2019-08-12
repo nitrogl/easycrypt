@@ -148,6 +148,7 @@
     "byequiv"     , BYEQUIV    ;        (* KW: tactic *)
     "fel"         , FEL        ;        (* KW: tactic *)
     "declassify"  , DECLASSIFY ;        (* KW: tactic *)
+    "secsample"   , SECSAMPLE  ;        (* KW: tactic *)
 
     "conseq"      , CONSEQ     ;        (* KW: tactic *)
     "exfalso"     , EXFALSO    ;        (* KW: tactic *)

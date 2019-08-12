@@ -12,7 +12,5 @@ open EcParsetree
 open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
-(* val t_hoare_declassify   : backward *)
-(* val t_bdhoare_declassify : backward *)
-(* val t_equiv_declassify   : oside -> backward *)
-val process_declassify : oside -> backward
+val process_declassify : side -> backward
+val process_secsample  : side -> backward

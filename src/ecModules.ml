@@ -297,7 +297,7 @@ let get_rnd = function
   | _ -> None
 
 let get_secrnd = function
-  | { i_node = Srnd (lv, e) } -> Some (lv, e)
+  | { i_node = Ssecrnd (lv, e) } -> Some (lv, e)
   | _ -> None
 
 let get_call = function

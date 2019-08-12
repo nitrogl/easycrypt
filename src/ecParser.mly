@@ -2712,8 +2712,11 @@ phltactic:
 | CFOLD s=side? c=codepos
     { Pcfold (s, c, None) }
 
-| DECLASSIFY s=side?
+| DECLASSIFY s=side
     { Pdeclassify (s) }
+
+| SECSAMPLE s=side
+    { Psecsample (s) }
 
 | RND s=side? info=rnd_info
     { Prnd (s, info) }
