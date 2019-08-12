@@ -107,6 +107,18 @@ module CI_Pred = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module CI_Option = struct
+  let i_Option  = "Logic"
+  let p_Option  = EcPath.pqname p_top i_Option
+  
+  let _Option x = EcPath.pqname p_Option x
+  let p_option = _Option "option"
+  
+  let p_some = _Option "Some"
+  let p_none = _Option "None"
+end
+
+(* -------------------------------------------------------------------- *)
 module CI_Distr = struct
   let i_Distr = "Distr"
   let p_Distr = EcPath.pqname p_top i_Distr

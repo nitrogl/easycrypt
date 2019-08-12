@@ -128,6 +128,7 @@ let tglob m      = mk_ty (Tglob m)
 let tunit            = tconstr EcCoreLib.CI_Unit    .p_unit            []
 let tbool            = tconstr EcCoreLib.CI_Bool    .p_bool            []
 let tint             = tconstr EcCoreLib.CI_Int     .p_int             []
+let toption ty       = tconstr EcCoreLib.CI_Option  .p_option          [ty]
 let tdistr ty        = tconstr EcCoreLib.CI_Distr   .p_distr           [ty]
 let tconfidentiality = tconstr EcCoreLib.CI_Leakable.p_confidentiality []
 let tleakable ty     = tconstr EcCoreLib.CI_Leakable.p_leakable        [ty]
@@ -155,6 +156,17 @@ let rec tyfun_flat (ty : ty) =
       let dom, codom = tyfun_flat t2 in (t1 :: dom, codom)
   | _ ->
       ([], ty)
+
+(* -------------------------------------------------------------------- *)
+let as_toption (ty : ty) =
+  match ty.ty_node with
+  | Tconstr (p, [sty])
+      when EcPath.p_equal p EcCoreLib.CI_Option.p_option
+    -> Some sty
+
+  | _ -> None
+
+let is_toption (ty : ty) = as_toption ty <> None
 
 (* -------------------------------------------------------------------- *)
 let as_tdistr (ty : ty) =
@@ -1049,4 +1061,3 @@ let split_args e =
   match e.e_node with
   | Eapp (e, args) -> (e, args)
   | _ -> (e, [])
-

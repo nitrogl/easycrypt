@@ -112,6 +112,16 @@ module CI_Pred : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module CI_Option : sig
+  val i_Option : symbol
+  val p_Option : path
+
+  val p_option      : path
+  val p_some        : path
+  val p_none        : path
+end
+
+(* -------------------------------------------------------------------- *)
 module CI_Distr : sig
   val i_Distr : symbol
   val p_Distr : path
@@ -189,6 +199,7 @@ module CI_Logic : sig
   val p_fcongr        : path
   val p_eq_sym        : path
   val p_eq_sym_imp    : path
+  val p_negbTE        : path
   val p_negeqF        : path
 
   val p_iff_lr        : path
@@ -197,6 +208,4 @@ module CI_Logic : sig
   val p_cut_lemma     : path
   val p_case_eq_bool  : path
   val p_ip_dup        : path
-
-  val p_negbTE        : path
 end

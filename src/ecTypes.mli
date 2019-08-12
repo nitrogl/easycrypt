@@ -52,6 +52,7 @@ val tunit            : ty
 val tbool            : ty
 val tint             : ty
 val treal            : ty
+val toption          : ty -> ty
 val tdistr           : ty -> ty
 val tconfidentiality : ty
 val tleakable        : ty -> ty
