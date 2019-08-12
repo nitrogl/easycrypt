@@ -96,6 +96,7 @@ module CI_Real = struct
   let p_real_abs    = EcPath.extend p_Real ["`|_|"]
 end
 
+(* -------------------------------------------------------------------- *)
 module CI_Pred = struct
   let i_Pred  = "Logic"
   let p_Pred  = EcPath.pqname p_top i_Pred
@@ -110,7 +111,7 @@ module CI_Distr = struct
   let i_Distr = "Distr"
   let p_Distr = EcPath.pqname p_top i_Distr
   let _Distr  = fun x -> EcPath.pqname p_Distr x
-  let p_distr = _Distr "distr"
+  let p_distr = _Pervasive "distr"
 
   let p_dbool      = EcPath.extend p_top ["DBool"; "dbool"]
   let p_dbitstring = EcPath.extend p_Distr ["Dbitstring"; "dbitstring"]
