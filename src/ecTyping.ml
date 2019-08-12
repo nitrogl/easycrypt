@@ -1909,6 +1909,12 @@ and transinstr
       unify_or_fail env ue prvalue.pl_loc ~expct:(tleakable lty) rty;
       [ i_secasgn (lvalue, rvalue) ]
 
+  | PSrnd (plvalue, prvalue) ->
+      let lvalue, lty = translvalue ue env plvalue in
+      let rvalue, rty = transexp env `InProc ue prvalue in
+      unify_or_fail env ue prvalue.pl_loc ~expct:(tdistr lty) rty;
+      [ i_rnd (lvalue, rvalue) ]
+
   | PSsecrnd (plvalue, prvalue) ->
       let lvalue, lty = translvalue ue env plvalue in
       let rvalue, rty = transexp env `InProc ue prvalue in
@@ -1916,12 +1922,6 @@ and transinstr
       unify_or_fail env ue prvalue.pl_loc ~expct:(tdistr sty) rty;
       unify_or_fail env ue prvalue.pl_loc ~expct:(tleakable sty) lty;
       [ i_secrnd (lvalue, rvalue) ]
-
-  | PSrnd (plvalue, prvalue) ->
-      let lvalue, lty = translvalue ue env plvalue in
-      let rvalue, rty = transexp env `InProc ue prvalue in
-      unify_or_fail env ue prvalue.pl_loc ~expct:(tdistr lty) rty;
-      [ i_rnd (lvalue, rvalue) ]
 
   | PScall (None, name, args) ->
       let (fpath, args, _rty) = transcall name (unloc args) in
