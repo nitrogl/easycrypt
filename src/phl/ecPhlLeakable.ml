@@ -287,7 +287,7 @@ let t_equiv_undeclassify_r tc =
   let (r_lv, r_leakable), r_s = tc1_last_secasgn tc es.es_sr in
  
   (* TODO: contemplate the symmetric situation *)
-  let (a_lv, leakable), l_s = tc1_last_secrnd tc l_s in
+  let (a_lv, a_leakable), l_s = tc1_last_secrnd tc l_s in
   
   
   let l_ty_leakable = fun i -> proj_leakable_ty env i (e_ty l_leakable) in
@@ -301,7 +301,21 @@ let t_equiv_undeclassify_r tc =
   let r_e_inst = e_proj r_leakable 0 (r_ty_leakable 0) in
   let r_assignment = s_asgn (r_lv, r_e_inst) in
   
-  let a_e_inst = e_proj a_leakable 0 (a_ty_leakable 0) in
+  (* Create a variable matching the value of the already filled map *)
+  let v = { v_name = "v"; v_type = r_leakable.e_ty } in
+  let m, s = fresh_pv es.es_ml v in
+  let f = EcMemory.xpath m in
+  let sv = EcTypes.pv_loc f s in
+  let v = f_pvar sv v.v_type (fst m) in
+  let v_mem = form_of_expr (fst es.es_mr) r_leakable in
+  let eq_v_m = f_eq v v_mem in
+  
+(*   let v = { v_name = "sv"; v_type = ty_distr } in *)
+(*   let m, s = fresh_pv es_ml v in *)
+(*   let f = EcMemory.xpath m in *)
+(*   let sv = EcTypes.pv_loc f s in *)
+  
+  let a_e_inst = e_var sv r_leakable.e_ty in
   let a_assignment = s_asgn (a_lv, a_e_inst) in
   
   (* Flag the map value as "LEAKED" *)
@@ -342,35 +356,21 @@ let t_equiv_undeclassify_r tc =
 (*   Printf.printf "assign rvalue is: %s\n" (expr_to_string et); *)
   
   (* Build up the mutation *)
-  let s' = s_seq s' declassification in
-  let s' = s_seq s' assignment in
+  let l_s' = s_seq l_s a_assignment in
+  let l_s' = s_seq l_s' l_assignment in
+  let r_s' = s_seq r_s r_assignment in
+  let pre = f_and_simpl es.es_pr eq_v_m in
   let post = es.es_po in
   
-  let concl =
-    match side with
-    | `Left  -> f_equivS_r { es with es_ml = m; es_sl=s'; es_po=post; }
-    | `Right -> f_equivS_r { es with es_mr = m; es_sr=s'; es_po=post; }
+  let concl = f_equivS_r { es with
+(*     es_ml = m; *)
+    es_sl=l_s';
+    es_sr=r_s';
+    es_pr=pre;
+    es_po=post;
+  }
   in
   FApi.xmutate1 tc `SecAsgn [concl]
-  
-  
-  
-  
-  
-  
-  
-  let tl  = List.olast es.es_sl.s_node |> omap i_node in
-  let tr  = List.olast es.es_sr.s_node |> omap i_node in
-  match tl, tr with
-  | Some (Srnd (_, e1)), Some (Srnd (_, e2)) ->
-      if   EcReduction.EqTest.for_type env e1.e_ty e2.e_ty
-      then EcPhlRnd.wp_equiv_rnd None tc
-      else tc_noauto_error !!tc ()
-
-  | Some (Srnd _), _ -> EcPhlRnd.wp_equiv_disj_rnd `Left  tc
-  | _, Some (Srnd _) -> EcPhlRnd.wp_equiv_disj_rnd `Right tc
-
-  | _, _ -> tc_noauto_error !!tc ()
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_undeclassify   = FApi.t_low0 "equiv-undeclassify"   t_equiv_undeclassify_r
