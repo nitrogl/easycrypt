@@ -204,6 +204,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Prnd (side, info)         -> EcPhlRnd.process_rnd side info
     | Pdeclassify side          -> EcPhlLeakable.process_declassify side
     | Psecsample  side          -> EcPhlLeakable.process_secsample side
+    | Pundeclassify             -> EcPhlLeakable.process_undeclassify
     | Pconseq (opt, info)       -> EcPhlConseq.process_conseq_opt opt info
     | Pconseqauto cm            -> process_conseqauto cm
     | Phrex_elim                -> EcPhlExists.t_hr_exists_elim

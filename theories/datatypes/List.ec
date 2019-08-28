@@ -1253,7 +1253,19 @@ qed.
 
 lemma index_uniq z0 i (s : 'a list):
   0 <= i < size s => uniq s => index (nth z0 s i) s = i.
-proof. by elim: s i; smt. qed.
+proof.
+  elim/last_ind s => //=.
+  + rewrite lez_lt_asym //.
+  + move => l e ibase.
+    rewrite -cats1 cat_uniq size_cat /=.
+    move => [luniq el] [imin imax].
+    rewrite nth_cat /=.
+    case (size l = i) => //= sl.
+    * rewrite sl /= index_cat /index /pred1 imax //=.
+    * have nsup: i < size l by rewrite ltz_def sl /= -(lez_add2l 1) lez_add1r addzC //.
+      rewrite nsup /= index_cat mem_nth //=.
+      apply ibase => //.
+qed.
 
 lemma rem_uniq x s: uniq<:'a> s => uniq (rem x s).
 proof.                          (* FIXME: subseq *)

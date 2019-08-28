@@ -141,7 +141,7 @@ val proj_distr_ty : EcEnv.env -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
 (* projects 'a leakable type into 'a *)
-val proj_leakable_ty : EcEnv.env -> ty -> ty
+val proj_leakable_ty : EcEnv.env -> int -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
 type op_kind = [

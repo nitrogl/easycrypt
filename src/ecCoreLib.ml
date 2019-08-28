@@ -165,6 +165,18 @@ module CI_Map = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module CI_FMap = struct
+  let i_Map = "SmtMap"
+  let p_Map = EcPath.pqname p_top i_Map
+  let _Map  = fun x -> EcPath.pqname p_Map x
+
+  let p_map = _Map "fmap"
+  let p_get = _Map s_get
+  let p_set = _Map s_set
+  let p_cst = _Map "cst"
+end
+
+(* -------------------------------------------------------------------- *)
 module CI_Logic = struct
   let i_Logic  = "Tactics"
   let p_Logic  = EcPath.pqname p_top i_Logic

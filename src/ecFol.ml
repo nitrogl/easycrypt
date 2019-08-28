@@ -104,23 +104,16 @@ let f_real_div f1 f2 =
   f_real_mul f1 (f_real_inv f2)
 
 (* -------------------------------------------------------------------- *)
-let proj_constr_ty i ty =
-  match ty.ty_node with
-  | Tconstr(_,lty) when 0 <= i && i < List.length lty ->
-    List.nth lty i
-  | _ -> assert false
-
 let proj_constr_env_ty i env ty =
   match (EcEnv.Ty.hnorm ty env).ty_node with
   | Tconstr(_,lty) when 0 <= i && i < List.length lty ->
     List.nth lty i
   | _ -> assert false
 
-let proj_tuple_env_ty i env ty ty' =
+let proj_tuple_env_ty i env ty =
   match (EcEnv.Ty.hnorm ty env).ty_node with
   | Ttuple(lty) when 0 <= i && i < List.length lty ->
-    let ty = List.nth lty i in
-    if ty_equal ty ty' then ty else assert false
+    List.nth lty i
   | _ -> Printf.printf "wrong type %s\n" (dump_ty ty); assert false
 
 (* -------------------------------------------------------------------- *)
@@ -160,7 +153,7 @@ let fop_is_leaked ty =
 let fop_inst      ty =
   f_op CI.CI_Leakable.p_inst       [ty] (toarrow [tleakable ty] ty)
 
-let proj_leakable_ty env ty = proj_tuple_env_ty 0 env ty (proj_constr_ty 0 ty)
+let proj_leakable_ty env i ty = proj_tuple_env_ty i env ty
 
 let f_is_secret ty l =
   f_app (fop_is_secret ty) [l] tbool

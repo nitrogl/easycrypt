@@ -164,6 +164,16 @@ module CI_Map : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module CI_FMap : sig
+  val i_Map  : symbol
+  val p_Map  : path
+  val p_map  : path
+  val p_get  : path
+  val p_set  : path
+  val p_cst  : path
+end
+
+(* -------------------------------------------------------------------- *)
 module CI_Logic : sig
   val i_Logic  : symbol
   val p_Logic  : path
