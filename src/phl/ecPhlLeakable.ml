@@ -301,13 +301,16 @@ let t_equiv_undeclassify_r tc =
   let r_e_inst = e_proj r_leakable 0 (r_ty_leakable 0) in
   let r_assignment = s_asgn (r_lv, r_e_inst) in
   
-  (* Flag the map value as "LEAKED" *)
-  let map_lv = List.nth (snd (split_args leakable)) 0 in
-  let mapty, xty, mty = destr_ty_map map_lv in
-  let e, v = destr_expr_appmap map_lv in
+  let a_e_inst = e_proj a_leakable 0 (a_ty_leakable 0) in
+  let a_assignment = s_asgn (a_lv, a_e_inst) in
   
-  let e_distr = e_proj leakable 1 (ty_leakable 1) in
-  let e_leaked = e_op CI.CI_Leakable.p_leaked [] tconfidentiality in
+  (* Flag the map value as "LEAKED" *)
+(*   let map_lv = List.nth (snd (split_args leakable)) 0 in *)
+(*   let mapty, xty, mty = destr_ty_map map_lv in *)
+(*   let e, v = destr_expr_appmap map_lv in *)
+  
+(*   let e_distr = e_proj leakable 1 (ty_leakable 1) in *)
+(*   let e_leaked = e_op CI.CI_Leakable.p_leaked [] tconfidentiality in *)
 (*   let e_leaked = e_proj leakable 2 (ty_leakable 2) in *)
   
 (* LvMap (op, m, x, ty)
@@ -320,12 +323,12 @@ let t_equiv_undeclassify_r tc =
     let f   = f_app set [f_pvar pv ty m; form_of_expr m e; f] ty in
     LvVar(pv,ty), m, f
     *)
-  Printf.printf "map_lv = %s : %s\n" (expr_to_string map_lv) (dump_ty map_lv.e_ty);
-  let tys = [xty; mty] in
-  let mlv = LvMap((CI.CI_FMap.p_set, tys), v, e, mapty) in
-  Printf.printf "types for map set %s \n" (dump_tys tys);
-  let et = e_tuple [e_inst; e_distr; e_leaked] in
-  let declassification = s_asgn (mlv, et) in
+(*   Printf.printf "map_lv = %s : %s\n" (expr_to_string map_lv) (dump_ty map_lv.e_ty); *)
+(*   let tys = [xty; mty] in *)
+(*   let mlv = LvMap((CI.CI_FMap.p_set, tys), v, e, mapty) in *)
+(*   Printf.printf "types for map set %s \n" (dump_tys tys); *)
+(*   let et = e_tuple [e_inst; e_distr; e_leaked] in *)
+(*   let declassification = s_asgn (mlv, et) in *)
   
   (*
     | LvMap ((p, tys), pv, e', ty) ->
@@ -335,8 +338,8 @@ let t_equiv_undeclassify_r tc =
         sp_asgn mem env (LvVar (pv, ty)) e (bds, assoc, pre)
    *)     
         
-  Printf.printf "assign lvalue is: %s %s\n" (lvalue_to_string mlv) (EcPath.tostring (psymbol (symbol_of_lv mlv)));
-  Printf.printf "assign rvalue is: %s\n" (expr_to_string et);
+(*   Printf.printf "assign lvalue is: %s %s\n" (lvalue_to_string mlv) (EcPath.tostring (psymbol (symbol_of_lv mlv))); *)
+(*   Printf.printf "assign rvalue is: %s\n" (expr_to_string et); *)
   
   (* Build up the mutation *)
   let s' = s_seq s' declassification in
