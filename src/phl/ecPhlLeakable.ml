@@ -85,11 +85,19 @@ let destr_proj e : expr * int = (* [[move me to ecTypes?]] *)
   | _ -> raise E.Abort
 
 (* -------------------------------------------------------------------- *)
-let destr_expr_appmap e : expr * prog_var = (* [[move me to ecTypes?]] *)
+let destr_expr_pvar_appmap e : expr * prog_var = (* [[move me to ecTypes?]] *)
   let module E = struct exception Abort end in
   match e.e_node with
   | Eapp (e, vl) when List.length vl = 2
       -> (List.nth vl 1, destr_var (List.nth vl 0))
+  | _ -> raise E.Abort
+
+(* -------------------------------------------------------------------- *)
+let destr_expr_appmap e : expr * expr = (* [[move me to ecTypes?]] *)
+  let module E = struct exception Abort end in
+  match e.e_node with
+  | Eapp (e, vl) when List.length vl = 2
+      -> (List.nth vl 1, List.nth vl 0)
   | _ -> raise E.Abort
 
 (* -------------------------------------------------------------------- *)
@@ -121,6 +129,18 @@ let destr_app e : expr list = (* [[move me to ecTypes?]] *)
   | _ -> raise E.Abort
 
 (* -------------------------------------------------------------------- *)
+let destr_and_l : form -> form list = (* [[move me to ecTypes?]] *)
+  let rec destr_and_l' aux f =
+    let a, af =
+      try destr_and f
+      with DestrError _ -> (f, f)
+    in
+    if (f = af) then []
+    else destr_and_l' (aux @ [a]) af
+  in
+  destr_and_l' []
+
+(* -------------------------------------------------------------------- *)
 (* ------------------- Declassification (</) -------------------------- *)
 (* -------------------------------------------------------------------- *)
 
@@ -146,7 +166,7 @@ let t_equiv_declassify_sided_r side tc =
   (* Flag the map value as "LEAKED" *)
   let map_lv = List.nth (snd (split_args leakable)) 0 in
   let mapty, xty, mty = destr_ty_map map_lv in
-  let e, v = destr_expr_appmap map_lv in
+  let e, v = destr_expr_pvar_appmap map_lv in
   
   let e_distr = e_proj leakable 1 (ty_leakable 1) in
   let e_leaked = e_op CI.CI_Leakable.p_leaked [] tconfidentiality in
@@ -162,10 +182,10 @@ let t_equiv_declassify_sided_r side tc =
     let f   = f_app set [f_pvar pv ty m; form_of_expr m e; f] ty in
     LvVar(pv,ty), m, f
     *)
-  Printf.printf "map_lv = %s : %s\n" (expr_to_string map_lv) (dump_ty map_lv.e_ty);
+(*   Printf.printf "map_lv = %s : %s\n" (expr_to_string map_lv) (dump_ty map_lv.e_ty); *)
   let tys = [xty; mty] in
   let mlv = LvMap((CI.CI_FMap.p_set, tys), v, e, mapty) in
-  Printf.printf "types for map set %s \n" (dump_tys tys);
+(*   Printf.printf "types for map set %s \n" (dump_tys tys); *)
   let et = e_tuple [e_inst; e_distr; e_leaked] in
   let declassification = s_asgn (mlv, et) in
   
@@ -175,10 +195,9 @@ let t_equiv_declassify_sided_r side tc =
         let set   = e_op p tys mtype in
         let e     = e_app set [e_var pv ty; e'; e] ty in
         sp_asgn mem env (LvVar (pv, ty)) e (bds, assoc, pre)
-   *)     
-        
-  Printf.printf "assign lvalue is: %s %s\n" (lvalue_to_string mlv) (EcPath.tostring (psymbol (symbol_of_lv mlv)));
-  Printf.printf "assign rvalue is: %s\n" (expr_to_string et);
+   *)
+(*   Printf.printf "assign lvalue is: %s %s\n" (lvalue_to_string mlv) (EcPath.tostring (psymbol (symbol_of_lv mlv))); *)
+(*   Printf.printf "assign rvalue is: %s\n" (expr_to_string et); *)
   
   (* Build up the mutation *)
   let s' = s_seq s' declassification in
@@ -193,7 +212,7 @@ let t_equiv_declassify_sided_r side tc =
   FApi.xmutate1 tc `SecAsgn [concl]
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_declassify   = FApi.t_low1 "equiv-declassify"   t_equiv_declassify_sided_r
+let t_equiv_declassify = FApi.t_low1 "equiv-declassify" t_equiv_declassify_sided_r
 
 (* -------------------------------------------------------------------- *)
 let process_declassify side tc =
@@ -241,8 +260,10 @@ let t_equiv_secsample_sided_r side tc =
   let et = e_tuple [e_sv; e_odistr; e_secret] in
   let assignment = s_asgn (lv, et) in
   
-  Printf.printf "assign lvalue is: %s %s\n" (lvalue_to_string lv) (EcPath.tostring (psymbol (symbol_of_lv lv)));
-  Printf.printf "assign rvalue is: %s\n" (expr_to_string et);
+(*   Printf.printf "assign lvalue is: %s %s\n" (lvalue_to_string lv) (EcPath.tostring (psymbol (symbol_of_lv lv))); *)
+(*   Printf.printf "assign rvalue is: %s\n" (expr_to_string et); *)
+  
+  (* TODO: Additionally, we need the distribution not to be a singleton *)
   
   let s' = s_seq s' sampling in
   let s' = s_seq s' assignment in
@@ -272,27 +293,24 @@ let process_secsample side tc =
 (* -------------------------------------------------------------------- *)
 (* ------------------- Undeclassification (</) ------------------------ *)
 (* -------------------------------------------------------------------- *)
-
+ 
 (* -------------------------------------------------------------------- *)
-let tc_noauto_error pf ?loc () =
-  tc_error pf ?loc "nothing to automatize"
-  
 let t_equiv_undeclassify_r tc =
   let module E = struct exception Abort end in
   
   let env = FApi.tc1_env tc in
   let es  = tc1_as_equivS tc in
 
+  (* TODO: contemplate the symmetric situation *)
   let (l_lv, l_leakable), l_s = tc1_last_secasgn tc es.es_sl in
   let (r_lv, r_leakable), r_s = tc1_last_secasgn tc es.es_sr in
- 
-  (* TODO: contemplate the symmetric situation *)
-  let (a_lv, a_leakable), l_s = tc1_last_secrnd tc l_s in
-  
+
+  let (a_lv, distr), l_s = tc1_last_secrnd tc l_s in
+  let dty = e_ty distr in
+  let ty_distr = proj_distr_ty env dty in
   
   let l_ty_leakable = fun i -> proj_leakable_ty env i (e_ty l_leakable) in
   let r_ty_leakable = fun i -> proj_leakable_ty env i (e_ty r_leakable) in
-  let a_ty_leakable = fun i -> proj_leakable_ty env i (e_ty a_leakable) in
   
   (* Assignment from the instance value of the leakable entry *)
   let l_e_inst = e_proj l_leakable 0 (l_ty_leakable 0) in
@@ -310,57 +328,50 @@ let t_equiv_undeclassify_r tc =
   let v_mem = form_of_expr (fst es.es_mr) r_leakable in
   let eq_v_m = f_eq v v_mem in
   
-(*   let v = { v_name = "sv"; v_type = ty_distr } in *)
-(*   let m, s = fresh_pv es_ml v in *)
-(*   let f = EcMemory.xpath m in *)
-(*   let sv = EcTypes.pv_loc f s in *)
-  
+  (* Then modify the sampling to the required assignment *)
   let a_e_inst = e_var sv r_leakable.e_ty in
   let a_assignment = s_asgn (a_lv, a_e_inst) in
   
-  (* Flag the map value as "LEAKED" *)
-(*   let map_lv = List.nth (snd (split_args leakable)) 0 in *)
-(*   let mapty, xty, mty = destr_ty_map map_lv in *)
-(*   let e, v = destr_expr_appmap map_lv in *)
-  
-(*   let e_distr = e_proj leakable 1 (ty_leakable 1) in *)
-(*   let e_leaked = e_op CI.CI_Leakable.p_leaked [] tconfidentiality in *)
-(*   let e_leaked = e_proj leakable 2 (ty_leakable 2) in *)
-  
-(* LvMap (op, m, x, ty)
- * - op is the map-set operator
- * - m  is the map to be updated
- * - x  is the index to update
- * - ty is the type of the value [m]
-  | LvMap((p,tys),pv,e,ty) ->
-    let set = f_op p tys (toarrow [ty; e.e_ty; f.f_ty] ty) in
-    let f   = f_app set [f_pvar pv ty m; form_of_expr m e; f] ty in
-    LvVar(pv,ty), m, f
-    *)
-(*   Printf.printf "map_lv = %s : %s\n" (expr_to_string map_lv) (dump_ty map_lv.e_ty); *)
-(*   let tys = [xty; mty] in *)
-(*   let mlv = LvMap((CI.CI_FMap.p_set, tys), v, e, mapty) in *)
-(*   Printf.printf "types for map set %s \n" (dump_tys tys); *)
-(*   let et = e_tuple [e_inst; e_distr; e_leaked] in *)
-(*   let declassification = s_asgn (mlv, et) in *)
-  
-  (*
-    | LvMap ((p, tys), pv, e', ty) ->
-        let mtype = toarrow [ty; e'.e_ty; e.e_ty] ty in
-        let set   = e_op p tys mtype in
-        let e     = e_app set [e_var pv ty; e'; e] ty in
-        sp_asgn mem env (LvVar (pv, ty)) e (bds, assoc, pre)
-   *)     
-        
-(*   Printf.printf "assign lvalue is: %s %s\n" (lvalue_to_string mlv) (EcPath.tostring (psymbol (symbol_of_lv mlv))); *)
-(*   Printf.printf "assign rvalue is: %s\n" (expr_to_string et); *)
-  
-  (* Build up the mutation *)
+  (* The precondition requires a "bridge" linking the lazily-sampled value 
+   * with the eagerly-sampled value
+   *)
   let l_s' = s_seq l_s a_assignment in
   let l_s' = s_seq l_s' l_assignment in
   let r_s' = s_seq r_s r_assignment in
   let pre = f_and_simpl es.es_pr eq_v_m in
-  let post = es.es_po in
+  
+  (*
+   * In the post-condition, we need the undeclassify_invariant_fmap to hold
+   *)
+  let l_map = List.nth (snd (split_args l_leakable)) 0 in
+  let r_map = List.nth (snd (split_args r_leakable)) 0 in
+  let _, l_e = destr_expr_appmap l_map in
+  let r_idx, r_e = destr_expr_appmap r_map in
+  let l_v = destr_var l_e in
+  let r_v = destr_var r_e in
+  let f_distr = form_of_expr (fst es.es_ml) distr in
+  
+  (* TODO: we should not add inv_v if it is already amongst the post *)
+  let andl = destr_and_l es.es_po in
+  
+  let secret_v = f_is_secret (l_e_inst.e_ty) (form_of_expr (fst es.es_ml) l_leakable) in
+  let distr_v = f_sampled_from env f_distr (form_of_expr (fst es.es_ml) l_leakable) in
+  let inv_v =
+(*     Printf.printf "r_idx = %s : %s\n" (expr_to_string r_idx) (dump_ty r_idx.e_ty); *)
+(*     Printf.printf "l_e = %s : %s\n" (expr_to_string l_e) (dump_ty l_e.e_ty); *)
+(*     Printf.printf "r_e = %s : %s\n" (expr_to_string r_e) (dump_ty r_e.e_ty); *)
+(*     Printf.printf "l = %s : %s\n" (expr_to_string l_leakable) (dump_ty l_leakable.e_ty); *)
+(*     Printf.printf "r = %s : %s\n" (expr_to_string r_leakable) (dump_ty r_leakable.e_ty); *)
+    f_undeclassify_invariant_fmap
+      r_idx.e_ty
+      (r_ty_leakable 0)
+      (f_pvar l_v l_e.e_ty (fst es.es_ml))
+      (f_pvar r_v r_e.e_ty (fst es.es_mr))
+      f_distr
+  in
+  let post = f_and_simpl secret_v es.es_po in
+  let post = f_and_simpl distr_v post in
+  let post = f_and_simpl inv_v post in
   
   let concl = f_equivS_r { es with
 (*     es_ml = m; *)
