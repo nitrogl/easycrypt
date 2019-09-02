@@ -15,6 +15,7 @@
 pragma +implicits.
 pragma -oldip.
 
+require import Distr.
 require import SmtMap.
 
 (* -------------------------------------------------------------------- *)
@@ -29,7 +30,15 @@ type 'a leakable = 'a * ('a distr) option * confidentiality.
 op is_secret ['a] (v: 'a leakable) = SECRET = v.`3.
 op is_leaked ['a] (v: 'a leakable) = !(is_secret v).
 op inst ['a] (v: 'a leakable) = v.`1.
-op (|) ['a] (v: 'a leakable) (d: 'a distr) = v.`2 = Some d. (* equality can be too strong, but should be alright for now *)
+op sampled_from ['a] (d: 'a distr) (v: 'a leakable) = v.`2 = Some d.
+
+(*
+ * We call singleton those degenerative distribution where only a single
+ * value can be "sampled" from.
+ * So we call a proper distribution the non-singletons.
+ *)
+pred is_distr_singleton (d: 'a distr) = exists x, support d x => mu1 d x = 1%r.
+pred distr_proper (d: 'a distr) = !is_distr_singleton d.
 
 op vget ['a] (olx: ('a leakable) option) = inst (oget olx).
 
@@ -40,14 +49,15 @@ op ov_eq  ['a] (v w: ('a leakable) option) = (oget v).`1 = (oget w).`1.
 op od_eq  ['a] (v w: ('a leakable) option) = (oget v).`2 = (oget w).`2.
 op ovd_eq ['a] (v w: ('a leakable) option) = ((oget v).`1, (oget v).`2) = ((oget w).`1, (oget w).`2).
 
-abbrev (==)  (v w: ('a leakable) option) = ov_eq v w.
-abbrev (===) (v w: ('a leakable) option) = ovd_eq v w.
-abbrev (=|=) (v w: ('a leakable) option) = od_eq v w.
+abbrev (==)  ['a] (v w: ('a leakable) option) = ov_eq v w.
+abbrev (===) ['a] (v w: ('a leakable) option) = ovd_eq v w.
+abbrev (<=)  ['a] (v: 'a leakable) (d: 'a distr) = sampled_from d v.
 
 (* -------------------------------------------------------------------- *)
 (* This can be used in proofs when convenient *)
-op undeclassify_invariant_fmap ['a, 'b] (l m: ('a, 'b leakable) fmap) =
-     (forall x, dom l x => dom m x /\ l.[x] === m.[x] )
+op undeclassify_invariant_fmap ['a, 'b] (l m: ('a, 'b leakable) fmap) (d: 'b distr) =
+     (forall x, dom m x => oget m.[x] <= d)
+  /\ (forall x, dom l x => dom m x /\ l.[x] === m.[x])
   /\ (forall x, dom l x => is_leaked (oget m.[x]) => l.[x] = m.[x])
   /\ (forall x, !dom l x => dom m x => is_secret (oget m.[x]))
 .
