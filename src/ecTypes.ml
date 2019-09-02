@@ -134,6 +134,7 @@ let tconfidentiality = tconstr EcCoreLib.CI_Leakable.p_confidentiality []
 let tleakable ty     = tconstr EcCoreLib.CI_Leakable.p_leakable        [ty]
 let treal            = tconstr EcCoreLib.CI_Real    .p_real            []
 let tcpred ty        = tfun ty tbool
+let tfmap ty         = tconstr EcCoreLib.CI_FMap.p_map                 [ty]
 
 let ttuple lt    =
   match lt with

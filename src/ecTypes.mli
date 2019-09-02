@@ -56,6 +56,7 @@ val toption          : ty -> ty
 val tdistr           : ty -> ty
 val tconfidentiality : ty
 val tleakable        : ty -> ty
+val tfmap            : ty -> ty
 val tcpred           : ty -> ty
 val toarrow          : ty list -> ty -> ty
 
