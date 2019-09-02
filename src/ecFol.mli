@@ -60,21 +60,24 @@ val f_real_abs : form -> form
 (* soft constructors - distributions *)
 val fop_support : EcTypes.ty -> form
 
-val f_predT   : EcTypes.ty -> form
-val f_support : form -> form -> form
-val f_in_supp : form -> form -> form
-val f_mu      : EcEnv.env -> form -> form -> form
-val f_mu_x    : form -> form -> form
+val f_predT    : EcTypes.ty -> form
+val f_support  : form -> form -> form
+val f_in_supp  : form -> form -> form
+val f_mu       : EcEnv.env -> form -> form -> form
+val f_mu_x     : form -> form -> form
 val f_weight   : EcTypes.ty -> form -> form
 val f_lossless : EcTypes.ty -> form -> form
 
 (* soft constructors - leakable *)
-val f_is_secret : EcTypes.ty -> form -> form
-val f_is_leaked : EcTypes.ty -> form -> form
-val f_inst      : EcTypes.ty -> form -> form
+val f_is_secret    : EcTypes.ty -> form -> form
+val f_is_leaked    : EcTypes.ty -> form -> form
+val f_sampled_from : EcEnv.env -> form -> form -> form
+val f_inst         : EcTypes.ty -> form -> form
 
-val f_secret    : form
-val f_leaked    : form
+val f_secret       : form
+val f_leaked       : form
+
+val f_undeclassify_invariant_fmap : EcTypes.ty -> EcTypes.ty -> form -> form -> form -> form
 
 (* common functions *)
 val f_identity : ?name:EcSymbols.symbol -> EcTypes.ty -> form

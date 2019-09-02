@@ -145,12 +145,15 @@ module CI_Leakable : sig
   val p_leakable        : path
   val p_confidentiality : path
 
-  val p_is_secret : path
-  val p_is_leaked : path
-  val p_inst      : path
-
-  val p_leaked    : path
-  val p_secret    : path
+  val p_is_secret    : path
+  val p_is_leaked    : path
+  val p_sampled_from : path
+  val p_inst         : path
+  
+  val p_leaked       : path
+  val p_secret       : path
+  
+  val p_undeclassify_invariant_fmap : path
 end
 
 (* -------------------------------------------------------------------- *)

@@ -146,10 +146,13 @@ module CI_Leakable = struct
 
   let p_is_secret = _Leakable "is_secret"
   let p_is_leaked = _Leakable "is_leaked"
+  let p_sampled_from = _Leakable "sampled_from"
   let p_inst = _Leakable "inst"
   
   let p_secret = _Leakable "SECRET"
   let p_leaked = _Leakable "LEAKED"
+  
+  let p_undeclassify_invariant_fmap = _Leakable "undeclassify_invariant_fmap"
 end
 
 (* -------------------------------------------------------------------- *)

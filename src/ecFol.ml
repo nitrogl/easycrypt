@@ -146,12 +146,14 @@ let f_lossless ty d =
   f_app (fop_lossless ty) [d] tbool
 
 (* -------------------------------------------------------------------- *)
-let fop_is_secret ty =
-  f_op CI.CI_Leakable.p_is_secret  [ty] (toarrow [tleakable ty] tbool)
-let fop_is_leaked ty =
-  f_op CI.CI_Leakable.p_is_leaked  [ty] (toarrow [tleakable ty] tbool)
-let fop_inst      ty =
-  f_op CI.CI_Leakable.p_inst       [ty] (toarrow [tleakable ty] ty)
+let fop_is_secret    ty =
+  f_op CI.CI_Leakable.p_is_secret    [ty] (toarrow [tleakable ty] tbool)
+let fop_is_leaked    ty =
+  f_op CI.CI_Leakable.p_is_leaked    [ty] (toarrow [tleakable ty] tbool)
+let fop_sampled_from ty =
+  f_op CI.CI_Leakable.p_sampled_from [ty] (toarrow [tdistr ty; tleakable ty] tbool)
+let fop_inst         ty =
+  f_op CI.CI_Leakable.p_inst         [ty] (toarrow [tleakable ty] ty)
 
 let proj_leakable_ty env i ty = proj_tuple_env_ty i env ty
 
@@ -162,9 +164,26 @@ let f_is_leaked ty l =
 let f_inst ty l =
   f_app (fop_inst ty) [l] ty
   
+let f_sampled_from env f1 f2 = f_app (fop_sampled_from (proj_distr_ty env f1.f_ty)) [f1; f2] tbool
+  
 let f_secret = f_op CI.CI_Leakable.p_secret [] tconfidentiality
 let f_leaked = f_op CI.CI_Leakable.p_leaked [] tconfidentiality
 
+let fop_undeclassify_invariant_fmap ty1 ty2 =
+  f_op CI.CI_Leakable.p_undeclassify_invariant_fmap [ty1; ty2] (toarrow [
+      tfmap (ttuple [ty1; tleakable ty2])
+    ; tfmap (ttuple [ty1; tleakable ty2])
+    ; tdistr ty2
+  ] tbool)
+let f_undeclassify_invariant_fmap ty1 ty2 f1 f2 f3 =
+(*   Printf.printf "f1 type: %s\n" (dump_ty f1.f_ty); *)
+(*   Printf.printf "f2 type: %s\n" (dump_ty f2.f_ty); *)
+(*   let ty1 = proj_fmap_ty 0 env f1.f_ty in *)
+(*   Printf.printf "t1: %s\n" (dump_ty ty1); *)
+(*   let ty2 = proj_fmap_ty 1 env f1.f_ty in *)
+(*   Printf.printf "t2: %s\n" (dump_ty ty2); *)
+(*   f_app (fop_undeclassify_invariant_fmap ty1 ty2) [f1; f2] tbool *)
+  f_app (fop_undeclassify_invariant_fmap ty1 ty2) [f1; f2; f3] tbool
 (* -------------------------------------------------------------------- *)
 let f_losslessF f = f_bdHoareF f_true f f_true FHeq f_r1
 
