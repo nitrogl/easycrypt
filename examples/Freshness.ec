@@ -16,34 +16,50 @@ type Y.
 
 op dv : { Y distr | is_lossless dv } as dv_ll.
 
-module type Alg = {
+(*
+ * This is an example of algorithm module type, where
+ * - init: may do nothing
+ * - f: acts as a random function
+ * - prepare_f: prepares values for f, but does not disclose them
+ *)
+module type RF = {
   proc init(): unit
   proc f(x: X): Y
-  proc d(x: X): unit
+  proc prepare_f(x: X): unit
 }.
 
-module type AlgAccess = {
+(*
+ * This module type exposes the two precedures f and prepare_f,
+ * but hides the init procedure.
+ *)
+module type RFAccess = {
   proc f(x: X): Y
-  proc d(x: X): unit
+  proc prepare_f(x: X): unit
 }.
 
-module type Dist(A: AlgAccess) = {
+(*
+ * A distinguished is allowed to perform oracle calls to what RFAccess exposes.
+ * Plus, it is supposed to have an abstract procedure distinguish().
+ *)
+module type Dist(A: RFAccess) = {
   proc distinguish(): bool
 }.
 
 (*
  * The module M is a regular map that behaves as a lazy map
- * in the meaning that the values are sampled when either needed
- * (procedure f) or simply requested (procedure d).
+ * in the meaning that the values are fd when either needed
+ * (procedure f) or simply requested (procedure prepare_f).
+ *
+ * prepare_f is actually not as lazy as it can be.
  *)
-module M: Alg = {
+module M: RF = {
   var m: (X, Y) fmap
 
   proc init() = {
     m <- empty;
   }
 
-  proc f(x: X) = {
+  proc f(x: X): Y = {
     var ret;
 
     if (!(dom m x)) {
@@ -55,7 +71,7 @@ module M: Alg = {
     return ret;
   }
 
-  proc d(x: X) = {
+  proc prepare_f(x: X) = {
     if (!(dom m x)) {
       m.[x] <$ dv;
     }
@@ -63,11 +79,10 @@ module M: Alg = {
 }.
 
 (*
- * Eager here does not mean that all the map is filled in advance,
- * but it refers to the procedure d which fills the map without
- * revealing the sampled values, unlike the procedure f.
+ * HalfLazy here behaves exactly as M: it does not fill the map in advance,
+ * but act lazy for f, and not that lazy for prepare_f.
  *)
-module EagerM: Alg = {
+module HalfLazyM: RF = {
   var m: (X, Y leakable) fmap
 
   proc init() = {
@@ -86,7 +101,7 @@ module EagerM: Alg = {
     return ret;
   }
 
-  proc d(x: X) = {
+  proc prepare_f(x: X) = {
     if (!(dom m x)) {
       m.[x] </$ dv; (* EXPERIMENTAL SYNTAX *)
     }
@@ -94,13 +109,19 @@ module EagerM: Alg = {
 }.
 
 (*
- * Lazy here refers to the procedure d which does nothing,
+ * Lazy here refers to the procedure prepare_f which does nothing,
  * de facto procastinating the real sampling to when the
  * procedure f is called on the same value.
  * We call it lazy because its behaviour is lazier than the
- * Eager procedure.
+ * HalfLazy procedure.
+ *
+ * The only difference would be that when we call prepare_f, the map m
+ * is not filled in; therefore, having access to the inner memory of both
+ * LazyM and HalfLazyM, one could tell the difference of behaviour.
+ * Nevertheless, the distinguisher is not allowed to access them, but is
+ * restricted to merely call either f or prepare_f.
  *)
-module LazyM: Alg = {
+module LazyM: RF = {
   var m: (X, Y leakable) fmap
 
   proc init() = {
@@ -119,35 +140,36 @@ module LazyM: Alg = {
     return ret;
   }
 
-  proc d(x: X) = {
+  proc prepare_f(x: X) = {
   }
 }.
 
 (*
  * We prove that the behaviour of the module M (the regular EasyCrypt
- * lazy module) equals the behaviour of the module EagerM, which contains
+ * lazy module) equals the behaviour of the module HalfLazyM, which contains
  * the experimental syntax and leakable type in the map.
- * They do pretty much the same work, so the idea behind this equality is
+ * They do pretty much the same work and the additional information of the
+ * leakable type is actually neglected, so the idea behind this equality is
  * trivial to understand.
  *
  * Notably, the proof only requires the usage of the additional
  * experimental tactics "declassify" and "secsample", the rest of the proof
  * is exactly the same as it would have been without and with two
- * different types sampling from bijective distibutions.
+ * different types of sampling from bijective distibutions.
  *)
-lemma nosmt example_leakable_equivalence (D<: Dist{M,EagerM}) &m:
+lemma nosmt example_leakable_equivalence (D<: Dist{M,HalfLazyM}) &m:
   (M.m = empty){m} =>
-  (EagerM.m = empty){m} =>
-  Pr[D(M).distinguish() @ &m : res] = Pr[D(EagerM).distinguish() @ &m : res].
+  (HalfLazyM.m = empty){m} =>
+  Pr[D(M).distinguish() @ &m : res] = Pr[D(HalfLazyM).distinguish() @ &m : res].
 proof.
   move => *.
   byequiv (_: ={glob D}
-        /\ (forall x, dom M.m{1} x <=> dom EagerM.m{2} x)
-        /\ (forall x, dom M.m{1} x => oget M.m.[x]{1} = vget EagerM.m.[x]{2})
+        /\ (forall x, dom M.m{1} x <=> dom HalfLazyM.m{2} x)
+        /\ (forall x, dom M.m{1} x => oget M.m.[x]{1} = vget HalfLazyM.m.[x]{2})
         ==> _) => //.
   proc*.
-  call (_: (forall x, dom M.m{1} x <=> dom EagerM.m{2} x)
-        /\ (forall x, dom M.m{1} x => oget M.m.[x]{1} = vget EagerM.m.[x]{2})
+  call (_: (forall x, dom M.m{1} x <=> dom HalfLazyM.m{2} x)
+        /\ (forall x, dom M.m{1} x => oget M.m.[x]{1} = vget HalfLazyM.m.[x]{2})
        ) => //.
   (* call to f *)
   proc*; inline*.
@@ -187,7 +209,7 @@ proof.
     - case (x1 = x{2}) => x1x /=.
       * rewrite x1x (H2 _ H3) /vget /inst get_set_sameE Core.oget_some //.
       * rewrite get_set_neqE // (H2 _ H4) //.
-  (* call to d *)
+  (* call to prepare_f *)
   proc*; inline*.
   sp; if => //=.
   + (* condition *)
@@ -213,7 +235,7 @@ proof.
 (*
  * Here we demonstrate the usage of the leakable type to follow the information flow,
  * as we often do in on-paper proofs, to establish the statistical equality of
- * freshly sampled values and unrevealed values that have been sampled in the past.
+ * freshly f values and unrevealed values that have been prepared in the past.
  *
  * Before the experimental syntax and tactics introduced to work with leakable types,
  * we needed to create additional redundant modules with additional procedures for
@@ -225,18 +247,18 @@ proof.
  * Noticeably, the proof has been carried on with excruciating details, many of which
  * can be actually discharged automatically by SMT solvers.
  *)
-lemma nosmt example_leakable (D<: Dist{EagerM,LazyM}) &m:
+lemma nosmt example_leakable (D<: Dist{HalfLazyM,LazyM}) &m:
   distr_proper dv =>
   (LazyM.m = empty){m} =>
-  (EagerM.m = empty){m} =>
-  Pr[D(LazyM).distinguish() @ &m : res] = Pr[D(EagerM).distinguish() @ &m : res].
+  (HalfLazyM.m = empty){m} =>
+  Pr[D(LazyM).distinguish() @ &m : res] = Pr[D(HalfLazyM).distinguish() @ &m : res].
 proof.
   move => dv_proper lm0 em0.
   byequiv (_: ={glob D}
-        /\ undeclassify_invariant_fmap LazyM.m{1} EagerM.m{2} dv
+        /\ undeclassify_invariant_fmap LazyM.m{1} HalfLazyM.m{2} dv
         ==> _) => //.
   proc*.
-  call (_: undeclassify_invariant_fmap LazyM.m{1} EagerM.m{2} dv
+  call (_: undeclassify_invariant_fmap LazyM.m{1} HalfLazyM.m{2} dv
        ) => //.
   (* call to f *)
   proc*; inline*.
@@ -286,7 +308,7 @@ proof.
       * move : H; rewrite mem_set x1x get_set_sameE Core.oget_some //.
       * move : H H0; rewrite 2!mem_set x1x get_set_neqE //=; exact (mem_m _).
   * rcondt{1} 1; progress.
-    case (dom EagerM.m{2} x{2}) => //=; last first.
+    case (dom HalfLazyM.m{2} x{2}) => //=; last first.
     + rcondt{2} 1; progress.
       (* EXPERIMENTAL TACTIC *) declassify{1}.
       (* EXPERIMENTAL TACTIC *) declassify{2}.
@@ -379,7 +401,7 @@ proof.
         * move : H; rewrite mem_set x1x //=.
         * move : H; rewrite mem_set x1x /= => pre_Nm.
           move : (mem_m _ pre_Nm _) => //.
-  (* call to d *)
+  (* call to prepare_f *)
   proc*; inline*.
   sp; if{2} => //=.
   + (* then *)
