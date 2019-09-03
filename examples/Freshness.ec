@@ -183,7 +183,7 @@ proof.
     rewrite -iff_negb /= dom_eq //.
   + (* then *)
     wp => /=.
-    (* EXPERIMENTAL TACTIC *) secsample{2}.
+    (* EXPERIMENTAL TACTIC *) secrnd{2}.
     wp; rnd; wp; skip; progress.
     - rewrite 3!get_set_sameE Core.oget_some //=.
     - case (x1 = x{2}) => x1x /=.
@@ -210,14 +210,14 @@ proof.
       * rewrite x1x (H2 _ H3) /vget /inst get_set_sameE Core.oget_some //.
       * rewrite get_set_neqE // (H2 _ H4) //.
   (* call to prepare_f *)
-  proc*; inline*.
+  proc*; inline* => /=.
   sp; if => //=.
   + (* condition *)
     move => &1 &2 [_ [_ [_ [dom_eq same_value]]]]; subst.
     rewrite -iff_negb /= dom_eq //.
   + (* then *)
     wp => /=.
-    (* EXPERIMENTAL TACTIC *) secsample{2}.
+    (* EXPERIMENTAL TACTIC *) secrnd{2}.
     wp; rnd; wp; skip; progress.
     - case (x1 = x{2}) => x1x /=.
       * rewrite x1x mem_set //.
@@ -255,10 +255,10 @@ lemma nosmt example_leakable (D<: Dist{HalfLazyM,LazyM}) &m:
 proof.
   move => dv_proper lm0 em0.
   byequiv (_: ={glob D}
-        /\ undeclassify_invariant_fmap LazyM.m{1} HalfLazyM.m{2} dv
+        /\ secrndasgn_invariant_fmap LazyM.m{1} HalfLazyM.m{2} dv
         ==> _) => //.
   proc*.
-  call (_: undeclassify_invariant_fmap LazyM.m{1} HalfLazyM.m{2} dv
+  call (_: secrndasgn_invariant_fmap LazyM.m{1} HalfLazyM.m{2} dv
        ) => //.
   (* call to f *)
   proc*; inline*.
@@ -270,7 +270,7 @@ proof.
       move : (mem_l_m _ pre) => //.
     (* EXPERIMENTAL TACTIC *) declassify{1}.
     (* EXPERIMENTAL TACTIC *) declassify{2}.
-    wp; skip; rewrite /undeclassify_invariant_fmap /(===) /ovd_eq /=.
+    wp; skip; rewrite /secrndasgn_invariant_fmap /(===) /ovd_eq /=.
     move => &1 &2 [[_] [_] [_]]; subst; rewrite /invariant; move => [m_dv] [mem_l_m] [mem_l mem_m] pre /=.
     progress.
     - rewrite 2!get_set_sameE 2!Core.oget_some /=.
@@ -313,9 +313,9 @@ proof.
       (* EXPERIMENTAL TACTIC *) declassify{1}.
       (* EXPERIMENTAL TACTIC *) declassify{2}.
       wp => /=.
-      (* EXPERIMENTAL TACTIC *) secsample{1}.
-      (* EXPERIMENTAL TACTIC *) secsample{2}.
-      wp => /=; rnd; skip; rewrite /undeclassify_invariant_fmap /(===) /ovd_eq /=.
+      (* EXPERIMENTAL TACTIC *) secrnd{1}.
+      (* EXPERIMENTAL TACTIC *) secrnd{2}.
+      wp => /=; rnd; skip; rewrite /secrndasgn_invariant_fmap /(===) /ovd_eq /=.
       move => &1 &2 [[[_] [_] [_]]]; subst; rewrite /invariant; move => [m_dv] [mem_l_m] [mem_l mem_m] pre_l pre_e /=.
       progress.
       - rewrite 4!get_set_sameE 2!Core.oget_some //.
@@ -350,63 +350,72 @@ proof.
         * rewrite get_set_neqE // 2!mem_set x1x /= => pre_Nm pre_m.
           move : (mem_m _ pre_Nm pre_m) => //.
     + rcondf{2} 1; progress.
-      (* EXPERIMENTAL TACTIC *) undeclassify.
-      wp => /=; skip; rewrite /undeclassify_invariant_fmap /(===) /ovd_eq /=.
-      move => &1 &2 [[[[_] [_] [_]]]]; subst; move => [m_dv] [mem_l_m] [mem_l mem_m] pre_l pre_e _ /=; subst.
-      progress.
-      - case (x1 = x{2}) => //= x1x.
-        move : H; rewrite mem_set x1x /= => pre_m.
-        move : (mem_l_m _ pre_m) => //.
-      - case (x1 = x{2}) => //= x1x.
-        * rewrite x1x get_set_sameE //.
-        * move : H; rewrite mem_set x1x get_set_neqE ///= => pre_m.
-          move : (mem_l_m _ pre_m) => //.
-      - case (x1 = x{2}) => //= x1x.
-        * rewrite x1x get_set_sameE //.
-        * move : H; rewrite mem_set x1x get_set_neqE ///= => pre_m.
-          move : (mem_l_m _ pre_m) => //.
-      - case (x1 = x{2}) => //= x1x.
-        * rewrite x1x get_set_sameE //= -Core.some_oget.
-            rewrite -domE //.
-          trivial.
-        * move : H; rewrite get_set_neqE // mem_set x1x /= => pre_m.
-          move : (mem_l _ pre_m _) => //.
-      - case (x1 = x{2}) => /= x1x.
-        * move : H; rewrite mem_set x1x //=.
-        * move : H; rewrite mem_set x1x /= => pre_Nm.
-          move : (mem_m _ pre_Nm _) => //.
-      - rewrite get_set_sameE Core.oget_some /=.
-        move : (m_dv _ pre_e) => //.
-      - rewrite get_set_sameE Core.oget_some /=.
-        move : (mem_m _ pre_l _) => //.
-      - rewrite get_set_sameE Core.oget_some //=.
-      - case (x1 = x{2}) => //= x1x.
-        move : H; rewrite mem_set x1x /= => pre_m.
-        move : (mem_l_m _ pre_m) => //.
-      - case (x1 = x{2}) => //= x1x.
-        * rewrite x1x get_set_sameE //.
-        * move : H; rewrite mem_set x1x get_set_neqE ///= => pre_m.
-          move : (mem_l_m _ pre_m) => //.
-      - case (x1 = x{2}) => //= x1x.
-        * rewrite x1x get_set_sameE //.
-        * move : H; rewrite mem_set x1x get_set_neqE ///= => pre_m.
-          move : (mem_l_m _ pre_m) => //.
-      - case (x1 = x{2}) => //= x1x.
-        * rewrite x1x get_set_sameE //= -Core.some_oget.
-            rewrite -domE //.
-          trivial.
-        * move : H; rewrite get_set_neqE // mem_set x1x /= => pre_m.
-          move : (mem_l _ pre_m _) => //.
-      - case (x1 = x{2}) => /= x1x.
-        * move : H; rewrite mem_set x1x //=.
-        * move : H; rewrite mem_set x1x /= => pre_Nm.
-          move : (mem_m _ pre_Nm _) => //.
+      (* EXPERIMENTAL TACTIC *) secrndasgn.
+      * skip; rewrite /secrndasgn_invariant_fmap /(===) /ovd_eq /=.
+        move => &1 &2 [[[[_] [_] [_]]]]; subst; move => [m_dv] [mem_l_m] [mem_l mem_m] pre_l pre_e _ /=; subst.
+        progress; first by apply mem_m.
+      * (* EXPERIMENTAL TACTIC *) declassify{1}.
+        (* EXPERIMENTAL TACTIC *) declassify{2}.
+        wp => /=; skip; rewrite /secrndasgn_invariant_fmap /(===) /ovd_eq /=.
+        move => &1 &2 [[[[_] [_] [_]]]]; subst; move => [m_dv] [mem_l_m] [mem_l mem_m] pre_l pre_e _ /=; subst.
+        progress.
+        - case (x1 = x{2}) => //= x1x.
+          * rewrite x1x get_set_sameE Core.oget_some //=.
+            move : (m_dv _ pre_e) => //.
+          * move : H; rewrite mem_set x1x get_set_neqE ///= => pre_m.
+            move : (m_dv _ pre_m) => //.
+        - case (x1 = x{2}) => //= x1x.
+          * move : H; rewrite set_setE mem_set x1x //.
+          * move : H; rewrite set_setE /= 2!mem_set x1x /= => pre_m.
+            move : (mem_l_m _ pre_m) => //.
+        - case (x1 = x{2}) => //= x1x.
+          * rewrite x1x 3!get_set_sameE 2!Core.oget_some //.
+          * move : H; rewrite 2!mem_set x1x get_set_neqE // get_set_neqE // get_set_neqE //= => pre_m.
+            move : (mem_l_m _ pre_m) => //.
+        - case (x1 = x{2}) => //= x1x.
+          * rewrite x1x 3!get_set_sameE 2!Core.oget_some //.
+          * move : H; rewrite 2!mem_set x1x get_set_neqE // get_set_neqE // get_set_neqE ///= => pre_m.
+            move : (mem_l_m _ pre_m) => //.
+        - case (x1 = x{2}) => //= x1x.
+          * rewrite x1x 3!get_set_sameE Core.oget_some //.
+          * move : H H0; rewrite 2!mem_set x1x get_set_neqE // get_set_neqE // get_set_neqE ///= => pre_m pre_c.
+            move : (mem_l _ pre_m pre_c) => //.
+        - have x1x: x1 <> x{2} by move : H; rewrite get_set_sameE Core.oget_some set_setE /=; apply absurd => /= x1x; rewrite x1x mem_set //.
+          * move : H H0; rewrite 3!mem_set x1x get_set_neqE ///= => pre_m pre_c.
+            move : (mem_m _ pre_m pre_c) => //.
+        - rewrite 2!get_set_sameE 2!Core.oget_some /=.
+          move : (m_dv _ pre_e) => //.
+        - rewrite 3!get_set_sameE 2!Core.oget_some //.
+        - case (x1 = x{2}) => //= x1x.
+          * rewrite x1x get_set_sameE Core.oget_some //=.
+            move : (m_dv _ pre_e) => //.
+          * move : H; rewrite mem_set x1x get_set_neqE ///= => pre_m.
+            move : (m_dv _ pre_m) => //.
+        - case (x1 = x{2}) => //= x1x.
+          * move : H; rewrite set_setE mem_set x1x //.
+          * move : H; rewrite set_setE /= 2!mem_set x1x /= => pre_m.
+            move : (mem_l_m _ pre_m) => //.
+        - case (x1 = x{2}) => //= x1x.
+          * rewrite x1x 3!get_set_sameE 2!Core.oget_some //.
+          * move : H; rewrite 2!mem_set x1x get_set_neqE // get_set_neqE // get_set_neqE //= => pre_m.
+            move : (mem_l_m _ pre_m) => //.
+        - case (x1 = x{2}) => //= x1x.
+          * rewrite x1x 3!get_set_sameE 2!Core.oget_some //.
+          * move : H; rewrite 2!mem_set x1x get_set_neqE // get_set_neqE // get_set_neqE ///= => pre_m.
+            move : (mem_l_m _ pre_m) => //.
+        - case (x1 = x{2}) => //= x1x.
+          * rewrite x1x 3!get_set_sameE Core.oget_some //.
+          * move : H H0; rewrite 2!mem_set x1x get_set_neqE // get_set_neqE // get_set_neqE ///= => pre_m pre_c.
+            move : (mem_l _ pre_m pre_c) => //.
+        - have x1x: x1 <> x{2} by move : H; rewrite get_set_sameE Core.oget_some set_setE /=; apply absurd => /= x1x; rewrite x1x mem_set //.
+          * move : H H0; rewrite 3!mem_set x1x get_set_neqE ///= => pre_m pre_c.
+            move : (mem_m _ pre_m pre_c) => //.
   (* call to prepare_f *)
   proc*; inline*.
   sp; if{2} => //=.
   + (* then *)
-    (* EXPERIMENTAL TACTIC *) secsample{2}.
-    wp => /=; rnd{2}; skip; rewrite /undeclassify_invariant_fmap /(===) /ovd_eq /=.
+    (* EXPERIMENTAL TACTIC *) secrnd{2}.
+    wp => /=; rnd{2}; skip; rewrite /secrndasgn_invariant_fmap /(===) /ovd_eq /=.
     move => &1 &2 [[_] [_] [_]]; subst; rewrite /invariant; move => [m_dv] [mem_l_m] [mem_l mem_m] pre_e /=.
     progress.
     - exact dv_ll.

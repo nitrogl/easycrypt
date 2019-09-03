@@ -147,9 +147,9 @@
     "byphoare"    , BYPHOARE     ;        (* KW: tactic *)
     "byequiv"     , BYEQUIV      ;        (* KW: tactic *)
     "fel"         , FEL          ;        (* KW: tactic *)
-    "secsample"   , SECSAMPLE    ;        (* KW: tactic *)
+    "secrnd"      , SECRND       ;        (* KW: tactic *)
     "declassify"  , DECLASSIFY   ;        (* KW: tactic *)
-    "undeclassify", UNDECLASSIFY ;        (* KW: tactic *)
+    "secrndasgn"  , SECRNDASGN   ;        (* KW: tactic *)
 
     "conseq"      , CONSEQ       ;        (* KW: tactic *)
     "exfalso"     , EXFALSO      ;        (* KW: tactic *)

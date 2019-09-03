@@ -527,7 +527,7 @@
 %token SAMPLE
 %token SEARCH
 %token SECASGN
-%token SECSAMPLE
+%token SECRND
 %token SECTION
 %token SELF
 %token SEMICOLON
@@ -568,7 +568,7 @@
 %token TRIVIAL
 %token TRY
 %token TYPE
-%token UNDECLASSIFY
+%token SECRNDASGN
 %token UNDERSCORE
 %token UNDO
 %token UNROLL
@@ -1294,7 +1294,7 @@ base_instr:
 | x=lvalue LESAMPLE  e=expr
     { PSrnd (x, e) }
 
-| x=lvalue EQ SECSAMPLE e=expr
+| x=lvalue EQ SECRND e=expr
 | x=lvalue LESECSAMP  e=expr
     { PSsecrnd (x, e) }
 
@@ -2716,11 +2716,11 @@ phltactic:
 | DECLASSIFY s=side
     { Pdeclassify (s) }
 
-| UNDECLASSIFY
-    { Pundeclassify }
+| SECRNDASGN
+    { Psecrndasgn }
 
-| SECSAMPLE s=side
-    { Psecsample (s) }
+| SECRND s=side
+    { Psecrnd (s) }
 
 | RND s=side? info=rnd_info
     { Prnd (s, info) }

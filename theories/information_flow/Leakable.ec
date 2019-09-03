@@ -55,7 +55,7 @@ abbrev (<=)  ['a] (v: 'a leakable) (d: 'a distr) = sampled_from d v.
 
 (* -------------------------------------------------------------------- *)
 (* This can be used in proofs when convenient *)
-op undeclassify_invariant_fmap ['a, 'b] (l m: ('a, 'b leakable) fmap) (d: 'b distr) =
+op secrndasgn_invariant_fmap ['a, 'b] (l m: ('a, 'b leakable) fmap) (d: 'b distr) =
      (forall x, dom m x => oget m.[x] <= d)
   /\ (forall x, dom l x => dom m x /\ l.[x] === m.[x])
   /\ (forall x, dom l x => is_leaked (oget m.[x]) => l.[x] = m.[x])
