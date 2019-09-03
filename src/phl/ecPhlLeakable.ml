@@ -229,7 +229,7 @@ let process_declassify side tc =
 (* -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_secsample_sided_r side tc =
+let t_equiv_secrnd_sided_r side tc =
   let module E = struct exception Abort end in
 
   let env = FApi.tc1_env tc in
@@ -277,16 +277,16 @@ let t_equiv_secsample_sided_r side tc =
   FApi.xmutate1 tc `SecAsgn [concl]
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_secsample   = FApi.t_low1 "equiv-secsample"   t_equiv_secsample_sided_r
+let t_equiv_secrnd   = FApi.t_low1 "equiv-secrnd"   t_equiv_secrnd_sided_r
 
 (* -------------------------------------------------------------------- *)
-let process_secsample side tc =
+let process_secrnd side tc =
   let concl = FApi.tc1_goal tc in
 
   match side with
 
   | _ when is_equivS concl ->
-      t_equiv_secsample side tc
+      t_equiv_secrnd side tc
 
   | _ -> tc_error !!tc "conclusion is not equiv"
 
@@ -295,7 +295,7 @@ let process_secsample side tc =
 (* -------------------------------------------------------------------- *)
  
 (* -------------------------------------------------------------------- *)
-let t_equiv_undeclassify_r tc =
+let t_equiv_secrndasgn_r tc =
   let module E = struct exception Abort end in
   
   let env = FApi.tc1_env tc in
@@ -314,10 +314,10 @@ let t_equiv_undeclassify_r tc =
   
   (* Assignment from the instance value of the leakable entry *)
   let l_e_inst = e_proj l_leakable 0 (l_ty_leakable 0) in
-  let l_assignment = s_asgn (l_lv, l_e_inst) in
+  let l_assignment = s_secasgn (l_lv, l_leakable) in
   
-  let r_e_inst = e_proj r_leakable 0 (r_ty_leakable 0) in
-  let r_assignment = s_asgn (r_lv, r_e_inst) in
+(*   let r_e_inst = e_proj r_leakable 0 (r_ty_leakable 0) in *)
+  let r_assignment = s_secasgn (r_lv, r_leakable) in
   
   (* Create a variable matching the value of the already filled map *)
   let v = { v_name = "v"; v_type = r_leakable.e_ty } in
@@ -341,7 +341,7 @@ let t_equiv_undeclassify_r tc =
   let pre = f_and_simpl es.es_pr eq_v_m in
   
   (*
-   * In the post-condition, we need the undeclassify_invariant_fmap to hold
+   * In the post-condition, we need the secrndasgn_invariant_fmap to hold
    *)
   let l_map = List.nth (snd (split_args l_leakable)) 0 in
   let r_map = List.nth (snd (split_args r_leakable)) 0 in
@@ -354,7 +354,7 @@ let t_equiv_undeclassify_r tc =
   (* TODO: we should not add inv_v if it is already amongst the post *)
   let andl = destr_and_l es.es_po in
   
-  let secret_v = f_is_secret (l_e_inst.e_ty) (form_of_expr (fst es.es_ml) l_leakable) in
+  let secret_v = f_is_secret (l_e_inst.e_ty) v in
   let distr_v = f_sampled_from env f_distr (form_of_expr (fst es.es_ml) l_leakable) in
   let inv_v =
 (*     Printf.printf "r_idx = %s : %s\n" (expr_to_string r_idx) (dump_ty r_idx.e_ty); *)
@@ -362,16 +362,23 @@ let t_equiv_undeclassify_r tc =
 (*     Printf.printf "r_e = %s : %s\n" (expr_to_string r_e) (dump_ty r_e.e_ty); *)
 (*     Printf.printf "l = %s : %s\n" (expr_to_string l_leakable) (dump_ty l_leakable.e_ty); *)
 (*     Printf.printf "r = %s : %s\n" (expr_to_string r_leakable) (dump_ty r_leakable.e_ty); *)
-    f_undeclassify_invariant_fmap
+    f_secrndasgn_invariant_fmap
       r_idx.e_ty
       (r_ty_leakable 0)
       (f_pvar l_v l_e.e_ty (fst es.es_ml))
       (f_pvar r_v r_e.e_ty (fst es.es_mr))
       f_distr
   in
-  let post = f_and_simpl secret_v es.es_po in
-  let post = f_and_simpl distr_v post in
+  let post = f_and_simpl distr_v es.es_po in
   let post = f_and_simpl inv_v post in
+  
+  let secrecy = f_equivS_r { es with
+(*     es_ml = m; *)
+    es_sl=l_s;
+    es_sr=r_s;
+    es_pr=pre;
+    es_po=f_and_simpl pre secret_v;
+  } in
   
   let concl = f_equivS_r { es with
 (*     es_ml = m; *)
@@ -379,18 +386,17 @@ let t_equiv_undeclassify_r tc =
     es_sr=r_s';
     es_pr=pre;
     es_po=post;
-  }
-  in
-  FApi.xmutate1 tc `SecAsgn [concl]
+  } in
+  FApi.xmutate1 tc `SecAsgn [secrecy; concl]
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_undeclassify   = FApi.t_low0 "equiv-undeclassify"   t_equiv_undeclassify_r
+let t_equiv_secrndasgn   = FApi.t_low0 "equiv-secrndasgn"   t_equiv_secrndasgn_r
 
 (* -------------------------------------------------------------------- *)
-let process_undeclassify tc =
+let process_secrndasgn tc =
   let concl = FApi.tc1_goal tc in
 
   if is_equivS concl
-  then t_equiv_undeclassify tc
+  then t_equiv_secrndasgn tc
   else tc_error !!tc "conclusion is not equiv"
 
