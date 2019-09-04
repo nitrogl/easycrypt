@@ -185,6 +185,12 @@ let t_hoare_declassify_r tc =
   FApi.xmutate1 tc `SecAsgn [concl]
 
 (* -------------------------------------------------------------------- *)
+let t_dbhoare_declassify_r tc =
+  let bhs = tc1_as_bdhoareS tc in
+  let concl = f_bdHoareS_r { bhs with bhs_s=declassify_hoare_r bhs.bhs_s tc; } in
+  FApi.xmutate1 tc `SecAsgn [concl]
+
+(* -------------------------------------------------------------------- *)
 let t_equiv_declassify_sided_r side tc =
   let es = tc1_as_equivS tc in
   let concl =
@@ -197,8 +203,9 @@ let t_equiv_declassify_sided_r side tc =
   FApi.xmutate1 tc `SecAsgn [concl]
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_declassify = FApi.t_low1 "equiv-declassify" t_equiv_declassify_sided_r
-let t_hoare_declassify = FApi.t_low0 "hoare-declassify" t_hoare_declassify_r
+let t_equiv_declassify   = FApi.t_low1 "equiv-declassify"   t_equiv_declassify_sided_r
+let t_hoare_declassify   = FApi.t_low0 "hoare-declassify"   t_hoare_declassify_r
+let t_dbhoare_declassify = FApi.t_low0 "dbhoare-declassify" t_dbhoare_declassify_r
 
 (* -------------------------------------------------------------------- *)
 let process_declassify oside tc =
@@ -208,12 +215,15 @@ let process_declassify oside tc =
   | Some(side) when is_equivS concl ->
       t_equiv_declassify side tc
       
-  | Some(_) -> tc_error !!tc "conclusion is not equiv"
+  | Some(_) -> tc_error !!tc "conclusion is not equivalence"
       
   | None when is_hoareS concl ->
       t_hoare_declassify tc
+      
+  | None when is_bdHoareS concl ->
+      t_dbhoare_declassify tc
 
-  | None -> tc_error !!tc "conclusion is not hoare"
+  | None -> tc_error !!tc "conclusion is not hoare or bounded hoare"
 
 (* -------------------------------------------------------------------- *)
 (* ------------------- Undeclassification (</) ------------------------ *)
@@ -267,6 +277,12 @@ let t_hoare_secrnd_r tc =
   FApi.xmutate1 tc `SecAsgn [concl]
 
 (* -------------------------------------------------------------------- *)
+let t_bdhoare_secrnd_r tc =
+  let bhs = tc1_as_bdhoareS tc in
+  let concl = f_bdHoareS_r { bhs with bhs_s=secrnd_hoare_r bhs.bhs_m bhs.bhs_s tc; } in
+  FApi.xmutate1 tc `SecAsgn [concl]
+
+(* -------------------------------------------------------------------- *)
 let t_equiv_secrnd_sided_r side tc =
   let es = tc1_as_equivS tc in
   let concl =
@@ -279,8 +295,9 @@ let t_equiv_secrnd_sided_r side tc =
   FApi.xmutate1 tc `SecAsgn [concl]
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_secrnd = FApi.t_low1 "equiv-secrnd" t_equiv_secrnd_sided_r
-let t_hoare_secrnd = FApi.t_low0 "hoare-secrnd" t_hoare_secrnd_r
+let t_equiv_secrnd   = FApi.t_low1 "equiv-secrnd"   t_equiv_secrnd_sided_r
+let t_hoare_secrnd   = FApi.t_low0 "hoare-secrnd"   t_hoare_secrnd_r
+let t_bdhoare_secrnd = FApi.t_low0 "bdhoare-secrnd" t_bdhoare_secrnd_r
 
 (* -------------------------------------------------------------------- *)
 let process_secrnd oside tc =
@@ -290,12 +307,15 @@ let process_secrnd oside tc =
   | Some(side) when is_equivS concl ->
       t_equiv_secrnd side tc
       
-  | Some(_) -> tc_error !!tc "conclusion is not equiv"
+  | Some(_) -> tc_error !!tc "conclusion is not equivalence"
       
   | None when is_hoareS concl ->
       t_hoare_secrnd tc
+      
+  | None when is_bdHoareS concl ->
+      t_bdhoare_secrnd tc
 
-  | None -> tc_error !!tc "conclusion is not hoare"
+  | None -> tc_error !!tc "conclusion is not hoare or bounded hoare"
 
 (* -------------------------------------------------------------------- *)
 (* -------------- Secure random Assignment (</$ </ ~ </) -------------- *)
