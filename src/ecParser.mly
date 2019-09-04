@@ -528,6 +528,7 @@
 %token SEARCH
 %token SECASGN
 %token SECRND
+%token SECRNDASGN
 %token SECTION
 %token SELF
 %token SEMICOLON
@@ -568,7 +569,7 @@
 %token TRIVIAL
 %token TRY
 %token TYPE
-%token SECRNDASGN
+%token UNDECLASSIFY
 %token UNDERSCORE
 %token UNDO
 %token UNROLL
@@ -2713,13 +2714,16 @@ phltactic:
 | CFOLD s=side? c=codepos
     { Pcfold (s, c, None) }
 
-| DECLASSIFY s=side
+| DECLASSIFY s=side?
     { Pdeclassify (s) }
+
+| UNDECLASSIFY s=side?
+    { Pundeclassify (s) }
 
 | SECRNDASGN
     { Psecrndasgn }
 
-| SECRND s=side
+| SECRND s=side?
     { Psecrnd (s) }
 
 | RND s=side? info=rnd_info

@@ -145,16 +145,8 @@ let destr_and_l : form -> form list = (* [[move me to ecTypes?]] *)
 (* -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_declassify_sided_r side tc =
-  let module E = struct exception Abort end in
-
+let declassify_hoare_r s tc =
   let env = FApi.tc1_env tc in
-  let es = tc1_as_equivS tc in
-  let m, s =
-    match side with
-    | `Left  -> es.es_ml, es.es_sl
-    | `Right -> es.es_mr, es.es_sr
-  in
   
   let (lv, leakable), s' = tc1_last_secasgn tc s in
   let ty_leakable = fun i -> proj_leakable_ty env i (e_ty leakable) in
@@ -171,74 +163,73 @@ let t_equiv_declassify_sided_r side tc =
   let e_distr = e_proj leakable 1 (ty_leakable 1) in
   let e_leaked = e_op CI.CI_Leakable.p_leaked [] tconfidentiality in
 (*   let e_leaked = e_proj leakable 2 (ty_leakable 2) in *)
-  
-(* LvMap (op, m, x, ty)
- * - op is the map-set operator
- * - m  is the map to be updated
- * - x  is the index to update
- * - ty is the type of the value [m]
-  | LvMap((p,tys),pv,e,ty) ->
-    let set = f_op p tys (toarrow [ty; e.e_ty; f.f_ty] ty) in
-    let f   = f_app set [f_pvar pv ty m; form_of_expr m e; f] ty in
-    LvVar(pv,ty), m, f
-    *)
+
 (*   Printf.printf "map_lv = %s : %s\n" (expr_to_string map_lv) (dump_ty map_lv.e_ty); *)
   let tys = [xty; mty] in
   let mlv = LvMap((CI.CI_FMap.p_set, tys), v, e, mapty) in
 (*   Printf.printf "types for map set %s \n" (dump_tys tys); *)
   let et = e_tuple [e_inst; e_distr; e_leaked] in
   let declassification = s_asgn (mlv, et) in
-  
-  (*
-    | LvMap ((p, tys), pv, e', ty) ->
-        let mtype = toarrow [ty; e'.e_ty; e.e_ty] ty in
-        let set   = e_op p tys mtype in
-        let e     = e_app set [e_var pv ty; e'; e] ty in
-        sp_asgn mem env (LvVar (pv, ty)) e (bds, assoc, pre)
-   *)
 (*   Printf.printf "assign lvalue is: %s %s\n" (lvalue_to_string mlv) (EcPath.tostring (psymbol (symbol_of_lv mlv))); *)
 (*   Printf.printf "assign rvalue is: %s\n" (expr_to_string et); *)
   
   (* Build up the mutation *)
   let s' = s_seq s' declassification in
   let s' = s_seq s' assignment in
-  let post = es.es_po in
-  
+  s'
+
+(* -------------------------------------------------------------------- *)
+let t_hoare_declassify_r tc =
+  let hs = tc1_as_hoareS tc in
+  let concl = f_hoareS_r { hs with hs_s=declassify_hoare_r hs.hs_s tc; } in
+  FApi.xmutate1 tc `SecAsgn [concl]
+
+(* -------------------------------------------------------------------- *)
+let t_equiv_declassify_sided_r side tc =
+  let es = tc1_as_equivS tc in
   let concl =
     match side with
-    | `Left  -> f_equivS_r { es with es_ml = m; es_sl=s'; es_po=post; }
-    | `Right -> f_equivS_r { es with es_mr = m; es_sr=s'; es_po=post; }
+    | `Left  ->
+        f_equivS_r { es with es_sl=declassify_hoare_r es.es_sl tc; }
+    | `Right ->
+        f_equivS_r { es with es_sr=declassify_hoare_r es.es_sr tc; }
   in
   FApi.xmutate1 tc `SecAsgn [concl]
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_declassify = FApi.t_low1 "equiv-declassify" t_equiv_declassify_sided_r
+let t_hoare_declassify = FApi.t_low0 "hoare-declassify" t_hoare_declassify_r
 
 (* -------------------------------------------------------------------- *)
-let process_declassify side tc =
+let process_declassify oside tc =
   let concl = FApi.tc1_goal tc in
 
-  match side with
-  | _ when is_equivS concl ->
+  match oside with
+  | Some(side) when is_equivS concl ->
       t_equiv_declassify side tc
+      
+  | Some(_) -> tc_error !!tc "conclusion is not equiv"
+      
+  | None when is_hoareS concl ->
+      t_hoare_declassify tc
 
-  | _ -> tc_error !!tc "conclusion is not equiv"
+  | None -> tc_error !!tc "conclusion is not hoare"
+
+(* -------------------------------------------------------------------- *)
+(* ------------------- Undeclassification (</) ------------------------ *)
+(* -------------------------------------------------------------------- *)
+
+(* -------------------------------------------------------------------- *)
+let process_undeclassify oside tc =
+  tc_error !!tc "undeclassify tactic not yet implemented"
 
 (* -------------------------------------------------------------------- *)
 (* ------------------- Secure sampling (</$) -------------------------- *)
 (* -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_secrnd_sided_r side tc =
-  let module E = struct exception Abort end in
-
+let secrnd_hoare_r m s tc =
   let env = FApi.tc1_env tc in
-  let es = tc1_as_equivS tc in
-  let m, s =
-    match side with
-    | `Left  -> es.es_ml, es.es_sl
-    | `Right -> es.es_mr, es.es_sr
-  in
   
   let (lv, distr), s' = tc1_last_secrnd tc s in
   let dty = e_ty distr in
@@ -267,31 +258,47 @@ let t_equiv_secrnd_sided_r side tc =
   
   let s' = s_seq s' sampling in
   let s' = s_seq s' assignment in
-  let post = es.es_po in
-  
+  s'
+
+(* -------------------------------------------------------------------- *)
+let t_hoare_secrnd_r tc =
+  let hs = tc1_as_hoareS tc in
+  let concl = f_hoareS_r { hs with hs_s=secrnd_hoare_r hs.hs_m hs.hs_s tc; } in
+  FApi.xmutate1 tc `SecAsgn [concl]
+
+(* -------------------------------------------------------------------- *)
+let t_equiv_secrnd_sided_r side tc =
+  let es = tc1_as_equivS tc in
   let concl =
     match side with
-    | `Left  -> f_equivS_r { es with es_ml = m; es_sl=s'; es_po=post; }
-    | `Right -> f_equivS_r { es with es_mr = m; es_sr=s'; es_po=post; }
+    | `Left  ->
+        f_equivS_r { es with es_sl=secrnd_hoare_r es.es_ml es.es_sl tc; }
+    | `Right ->
+        f_equivS_r { es with es_sr=secrnd_hoare_r es.es_mr es.es_sr tc; }
   in
   FApi.xmutate1 tc `SecAsgn [concl]
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_secrnd   = FApi.t_low1 "equiv-secrnd"   t_equiv_secrnd_sided_r
+let t_equiv_secrnd = FApi.t_low1 "equiv-secrnd" t_equiv_secrnd_sided_r
+let t_hoare_secrnd = FApi.t_low0 "hoare-secrnd" t_hoare_secrnd_r
 
 (* -------------------------------------------------------------------- *)
-let process_secrnd side tc =
+let process_secrnd oside tc =
   let concl = FApi.tc1_goal tc in
 
-  match side with
-
-  | _ when is_equivS concl ->
+  match oside with
+  | Some(side) when is_equivS concl ->
       t_equiv_secrnd side tc
+      
+  | Some(_) -> tc_error !!tc "conclusion is not equiv"
+      
+  | None when is_hoareS concl ->
+      t_hoare_secrnd tc
 
-  | _ -> tc_error !!tc "conclusion is not equiv"
+  | None -> tc_error !!tc "conclusion is not hoare"
 
 (* -------------------------------------------------------------------- *)
-(* ------------------- Undeclassification (</) ------------------------ *)
+(* -------------- Secure random Assignment (</$ </ ~ </) -------------- *)
 (* -------------------------------------------------------------------- *)
  
 (* -------------------------------------------------------------------- *)

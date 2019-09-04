@@ -571,8 +571,9 @@ type phltactic =
   | Psp            of codepos1 doption option
   | Pwhile         of (oside * while_info)
   | Pasyncwhile    of async_while_info
-  | Pdeclassify    of side
-  | Psecrnd        of side
+  | Pdeclassify    of oside
+  | Pundeclassify  of oside
+  | Psecrnd        of oside
   | Psecrndasgn
   | Pfission       of (oside * codepos * (int * (int * int)))
   | Pfusion        of (oside * codepos * (int * (int * int)))

@@ -202,8 +202,9 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Palias info               -> EcPhlCodeTx.process_alias info
     | Pset info                 -> EcPhlCodeTx.process_set info
     | Prnd (side, info)         -> EcPhlRnd.process_rnd side info
-    | Pdeclassify side          -> EcPhlLeakable.process_declassify side
-    | Psecrnd side              -> EcPhlLeakable.process_secrnd side
+    | Pdeclassify oside         -> EcPhlLeakable.process_declassify oside
+    | Pundeclassify oside       -> EcPhlLeakable.process_undeclassify oside
+    | Psecrnd oside             -> EcPhlLeakable.process_secrnd oside
     | Psecrndasgn               -> EcPhlLeakable.process_secrndasgn
     | Pconseq (opt, info)       -> EcPhlConseq.process_conseq_opt opt info
     | Pconseqauto cm            -> process_conseqauto cm
