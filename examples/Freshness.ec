@@ -351,7 +351,7 @@ proof.
           move : (mem_m _ pre_Nm pre_m) => //.
     + rcondf{2} 1; progress.
       (* EXPERIMENTAL TACTIC *) secrndasgn.
-      * skip; rewrite /secrndasgn_invariant_fmap /(===) /ovd_eq /=.
+      * wp; skip; rewrite /secrndasgn_invariant_fmap /(===) /ovd_eq /=.
         move => &1 &2 [[[[_] [_] [_]]]]; subst; move => [m_dv] [mem_l_m] [mem_l mem_m] pre_l pre_e _ /=; subst.
         progress; first by apply mem_m.
       * (* EXPERIMENTAL TACTIC *) declassify{1}.
