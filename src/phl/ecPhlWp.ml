@@ -15,90 +15,6 @@ open EcFol
 open EcCoreGoal
 open EcLowPhlGoal
 
-open EcTypes
-open EcPath
-
-module CI = EcCoreLib
-
-let rec expr_to_string e = match e.e_node with (* [[remove me]] *)
-  | Eint   (i) -> "Eint(" ^ (EcBigInt.to_string i) ^ ")"
-  | Elocal (_) -> "Elocal"
-  | Evar   (v) -> "Evar(" ^ (EcTypes.string_of_pvar v) ^ ")"
-  | Eop    (p, tl) -> "Eop(" ^ (EcPath.tostring p) ^ " : " ^ (String.concat " -> " (List.map dump_ty tl)) ^ ")"
-  | Eapp   (e, el) -> "Eapp(" ^ (expr_to_string e) ^ ", [" ^ (List.fold_left (^) "" (List.map ((^) ", ") (List.map expr_to_string el))) ^ "])"
-  | Equant (_) -> "Equant"
-  | Elet   (_) -> "Elet"
-  | Etuple (l) -> "Etuple(" ^ (List.fold_left (^) "," (List.map expr_to_string l)) ^ ")"
-  | Eif    (c, t, e) -> "Eif(" ^ (expr_to_string c) ^ ", then " ^ (expr_to_string t) ^ ", else " ^ (expr_to_string e) ^ ")"
-  | Ematch (e, el, t) -> "Ematch(" ^ (expr_to_string e) ^ ", [" ^ (List.fold_left (^) " " (List.map ((^) ", ") (List.map expr_to_string el))) ^ "], type: " ^ (dump_ty t) ^ ")"
-  | Eproj  (t, i) -> "Eproj(" ^ (expr_to_string t) ^ " at [" ^ (string_of_int i) ^ "])"
-
-let lvalue_to_string lv = match lv with (* [[remove me]] *)
-  | LvVar   (v, t) -> "Variable " ^ (string_of_pvar v) ^ ": " ^ (dump_ty t)
-  | LvTuple (l) -> "[tuple" ^ (List.fold_left (^) ", " (List.map string_of_pvar (List.map fst l))) ^ "]"
-  | LvMap   ((p, tl), v, e, t) -> "Map[" ^ (EcPath.tostring p) ^ ":" ^ (String.concat " -> " (List.map dump_ty tl)) ^ "] of " ^ (string_of_pvar v) ^ "@{" ^ (expr_to_string e) ^ ": " ^ (dump_ty t) ^ "}"
-
-(* -------------------------------------------------------------------- *)
-
-let dump_tys tl = String.concat " -> " (List.map dump_ty tl)
-
-(* -------------------------------------------------------------------- *)
-let destr_ty_map e : ty * ty * ty = (* [[move me to ecTypes?]] *)
-  let module E = struct exception Abort end in
-  match e.e_node with
-  | Eapp (e, _) -> (match e.e_node with
-    | Eop (op, tl) when List.length tl = 2
-        -> (match e.e_ty.ty_node with
-           | Tfun(mty, _) -> (mty, List.nth tl 0, List.nth tl 1)
-           | _ -> raise E.Abort)
-    | _ -> raise E.Abort)
-  | _ -> raise E.Abort
-
-(* -------------------------------------------------------------------- *)
-let destr_op_map e : path = (* [[move me to ecTypes?]] *)
-  let module E = struct exception Abort end in
-  match e.e_node with
-  | Eapp (e, _) -> (match e.e_node with
-    | Eop (op, _) -> op
-    | _ -> raise E.Abort)
-  | _ -> raise E.Abort
-
-(* -------------------------------------------------------------------- *)
-let destr_expr_appmap e : expr * prog_var = (* [[move me to ecTypes?]] *)
-  let module E = struct exception Abort end in
-  match e.e_node with
-  | Eapp (e, vl) when List.length vl = 2
-      -> (List.nth vl 1, destr_var (List.nth vl 0))
-  | _ -> raise E.Abort
-  
-(* -------------------------------------------------------------------- *)
-let destr_tuple e : expr list = (* [[move me to ecTypes?]] *)
-  let module E = struct exception Abort end in
-  match e.e_node with
-  | Etuple es -> es
-  | _ -> raise E.Abort
-
-(* -------------------------------------------------------------------- *)
-let destr_tuple_proj e i : expr = (* [[move me to ecTypes?]] *)
-  let module E = struct exception Abort end in
-  match e.e_node with
-  | Etuple es -> List.nth es i
-  | _ -> raise E.Abort
-
-(* -------------------------------------------------------------------- *)
-let destr_proj e : expr * int = (* [[move me to ecTypes?]] *)
-  let module E = struct exception Abort end in
-  match e.e_node with
-  | Eproj (e, i) -> (e, i)
-  | _ -> raise E.Abort
-
-(* -------------------------------------------------------------------- *)
-let destr_app e : expr list = (* [[move me to ecTypes?]] *)
-  let module E = struct exception Abort end in
-  match e.e_node with
-  | Eapp (e, el) -> e::el
-  | _ -> raise E.Abort
-
 (* -------------------------------------------------------------------- *)
 module LowInternal = struct
   exception No_wp
@@ -118,23 +34,8 @@ module LowInternal = struct
 
   and wp_instr onesided env m i letsf =
     match i.i_node with
-    | Sasgn (lv,ex) ->
-  Printf.printf "assign lvalue is: %s %s\n" (lvalue_to_string lv) (EcPath.tostring (psymbol (symbol_of_lv lv)));
-  Printf.printf "assign rvalue is: %s\n" (expr_to_string ex);
-  (match lv with
-  | LvMap((p,tys), v, e, t) -> 
-      Printf.printf "map types for set: %s\n" (String.concat " -> " (List.map dump_ty tys));
-      (*
-      let map_lv = List.nth (destr_app (fst (destr_proj (destr_tuple_proj ex 0)))) 1 in
-  Printf.printf "\n extracted: %s : %s\n" (expr_to_string map_lv) (dump_ty map_lv.e_ty);
-      let mapty, xty, mty = destr_ty_map map_lv in
-      let e, v = destr_expr_appmap map_lv in
-
-      let mlv = LvMap((CI.CI_FMap.p_set, tys), v, e, mapty) in
-      Printf.printf "\n ---- lveq : %s\n\n" (if (lv_equal lv mlv) then "true" else "false")
-      *)
-  | _ -> Printf.printf "");
-        wp_asgn_aux m lv ex letsf
+    | Sasgn (lv,e) ->
+        wp_asgn_aux m lv e letsf
 
     | Sif (e,s1,s2) ->
         let r1,letsf1 = wp_stmt onesided env m (List.rev s1.s_node) letsf in
