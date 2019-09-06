@@ -572,7 +572,6 @@ type phltactic =
   | Pwhile         of (oside * while_info)
   | Pasyncwhile    of async_while_info
   | Pdeclassify    of oside
-  | Pundeclassify  of oside
   | Psecrnd        of oside
   | Psecrndasgn
   | Pfission       of (oside * codepos * (int * (int * int)))

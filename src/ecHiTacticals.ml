@@ -203,7 +203,6 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pset info                 -> EcPhlCodeTx.process_set info
     | Prnd (side, info)         -> EcPhlRnd.process_rnd side info
     | Pdeclassify oside         -> EcPhlLeakable.process_declassify oside
-    | Pundeclassify oside       -> EcPhlLeakable.process_undeclassify oside
     | Psecrnd oside             -> EcPhlLeakable.process_secrnd oside
     | Psecrndasgn               -> EcPhlLeakable.process_secrndasgn
     | Pconseq (opt, info)       -> EcPhlConseq.process_conseq_opt opt info

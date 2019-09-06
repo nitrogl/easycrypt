@@ -149,7 +149,6 @@
     "fel"         , FEL          ;        (* KW: tactic *)
     "secrnd"      , SECRND       ;        (* KW: tactic *)
     "declassify"  , DECLASSIFY   ;        (* KW: tactic *)
-    "undeclassify", UNDECLASSIFY ;        (* KW: tactic *)
     "secrndasgn"  , SECRNDASGN   ;        (* KW: tactic *)
 
     "conseq"      , CONSEQ       ;        (* KW: tactic *)

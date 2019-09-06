@@ -13,6 +13,5 @@ open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
 val process_declassify : oside -> backward
-val process_undeclassify : oside -> backward
 val process_secrnd : oside -> backward
 val process_secrndasgn : backward

@@ -569,7 +569,6 @@
 %token TRIVIAL
 %token TRY
 %token TYPE
-%token UNDECLASSIFY
 %token UNDERSCORE
 %token UNDO
 %token UNROLL
@@ -2716,9 +2715,6 @@ phltactic:
 
 | DECLASSIFY s=side?
     { Pdeclassify (s) }
-
-| UNDECLASSIFY s=side?
-    { Pundeclassify (s) }
 
 | SECRNDASGN
     { Psecrndasgn }
