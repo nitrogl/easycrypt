@@ -10,58 +10,21 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcFol
-open EcPath
 open EcTypes
-open EcEnv
-open EcDecl
 open EcModules
 
-open EcBigInt
-
 open EcCoreGoal
-open EcLowGoal
 open EcLowPhlGoal
 
 module Sid = EcIdent.Sid
 module CI = EcCoreLib
 
 (* -------------------------------------------------------------------- *)
-let rec expr_to_string e = match e.e_node with (* [[remove me]] *)
-  | Eint   (i) -> "Eint(" ^ (EcBigInt.to_string i) ^ ")"
-  | Elocal (_) -> "Elocal"
-  | Evar   (v) -> "Evar(" ^ (EcTypes.string_of_pvar v) ^ ")"
-  | Eop    (p, tl) -> "Eop(" ^ (EcPath.tostring p) ^ " : " ^ (String.concat " -> " (List.map dump_ty tl)) ^ ")"
-  | Eapp   (e, el) -> "Eapp(" ^ (expr_to_string e) ^ ", [" ^ (List.fold_left (^) "" (List.map ((^) ", ") (List.map expr_to_string el))) ^ "])"
-  | Equant (_) -> "Equant"
-  | Elet   (_) -> "Elet"
-  | Etuple (l) -> "Etuple(" ^ (List.fold_left (^) "," (List.map expr_to_string l)) ^ ")"
-  | Eif    (c, t, e) -> "Eif(" ^ (expr_to_string c) ^ ", then " ^ (expr_to_string t) ^ ", else " ^ (expr_to_string e) ^ ")"
-  | Ematch (e, el, t) -> "Ematch(" ^ (expr_to_string e) ^ ", [" ^ (List.fold_left (^) " " (List.map ((^) ", ") (List.map expr_to_string el))) ^ "], type: " ^ (dump_ty t) ^ ")"
-  | Eproj  (t, i) -> "Eproj(" ^ (expr_to_string t) ^ " at [" ^ (string_of_int i) ^ "])"
-
-let lvalue_to_string lv = match lv with (* [[remove me]] *)
-  | LvVar   (v, t) -> "Variable " ^ (string_of_pvar v) ^ ": " ^ (dump_ty t)
-  | LvTuple (l) -> "[tuple" ^ (List.fold_left (^) ", " (List.map string_of_pvar (List.map fst l))) ^ "]"
-  | LvMap   ((p, tl), v, e, t) -> "Map[" ^ (EcPath.tostring p) ^ ":" ^ (String.concat " -> " (List.map dump_ty tl)) ^ "] of " ^ (string_of_pvar v) ^ "@{" ^ (expr_to_string e) ^ ": " ^ (dump_ty t) ^ "}"
-  
-(* -------------------------------------------------------------------- *)
-let path_to_expr path env = (* [[remove me]] *)
-  let module E = struct exception Abort end in
-  let opkind = (Op.by_path path env).op_kind in
-  match opkind with
-  | OB_oper(Some (OP_Plain(e))) -> e
-  | _ -> raise E.Abort
-
-(* -------------------------------------------------------------------- *)
-
-let dump_tys tl = String.concat " -> " (List.map dump_ty tl)
-
-(* -------------------------------------------------------------------- *)
 let destr_ty_map e : ty * ty * ty = (* [[move me to ecTypes?]] *)
   let module E = struct exception Abort end in
   match e.e_node with
   | Eapp (e, _) -> (match e.e_node with
-    | Eop (op, tl) when List.length tl = 2
+    | Eop (_, tl) when List.length tl = 2
         -> (match e.e_ty.ty_node with
            | Tfun(mty, _) -> (mty, List.nth tl 0, List.nth tl 1)
            | _ -> raise E.Abort)
@@ -69,26 +32,10 @@ let destr_ty_map e : ty * ty * ty = (* [[move me to ecTypes?]] *)
   | _ -> raise E.Abort
 
 (* -------------------------------------------------------------------- *)
-let destr_op_map e : path = (* [[move me to ecTypes?]] *)
-  let module E = struct exception Abort end in
-  match e.e_node with
-  | Eapp (e, _) -> (match e.e_node with
-    | Eop (op, _) -> op
-    | _ -> raise E.Abort)
-  | _ -> raise E.Abort
-
-(* -------------------------------------------------------------------- *)
-let destr_proj e : expr * int = (* [[move me to ecTypes?]] *)
-  let module E = struct exception Abort end in
-  match e.e_node with
-  | Eproj (e, i) -> (e, i)
-  | _ -> raise E.Abort
-
-(* -------------------------------------------------------------------- *)
 let destr_expr_pvar_appmap e : expr * prog_var = (* [[move me to ecTypes?]] *)
   let module E = struct exception Abort end in
   match e.e_node with
-  | Eapp (e, vl) when List.length vl = 2
+  | Eapp (_, vl) when List.length vl = 2
       -> (List.nth vl 1, destr_var (List.nth vl 0))
   | _ -> raise E.Abort
 
@@ -96,49 +43,9 @@ let destr_expr_pvar_appmap e : expr * prog_var = (* [[move me to ecTypes?]] *)
 let destr_expr_appmap e : expr * expr = (* [[move me to ecTypes?]] *)
   let module E = struct exception Abort end in
   match e.e_node with
-  | Eapp (e, vl) when List.length vl = 2
+  | Eapp (_, vl) when List.length vl = 2
       -> (List.nth vl 1, List.nth vl 0)
   | _ -> raise E.Abort
-
-(* -------------------------------------------------------------------- *)
-let destr_tuple e : expr list = (* [[move me to ecTypes?]] *)
-  let module E = struct exception Abort end in
-  match e.e_node with
-  | Etuple es -> es
-  | _ -> raise E.Abort
-
-(* -------------------------------------------------------------------- *)
-let destr_tuple_proj e i : expr = (* [[move me to ecTypes?]] *)
-  let module E = struct exception Abort end in
-  match e.e_node with
-  | Etuple es -> List.nth es i
-  | _ -> raise E.Abort
-
-(* -------------------------------------------------------------------- *)
-let destr_proj e : expr * int = (* [[move me to ecTypes?]] *)
-  let module E = struct exception Abort end in
-  match e.e_node with
-  | Eproj (e, i) -> (e, i)
-  | _ -> raise E.Abort
-
-(* -------------------------------------------------------------------- *)
-let destr_app e : expr list = (* [[move me to ecTypes?]] *)
-  let module E = struct exception Abort end in
-  match e.e_node with
-  | Eapp (e, el) -> e::el
-  | _ -> raise E.Abort
-
-(* -------------------------------------------------------------------- *)
-let destr_and_l : form -> form list = (* [[move me to ecTypes?]] *)
-  let rec destr_and_l' aux f =
-    let a, af =
-      try destr_and f
-      with DestrError _ -> (f, f)
-    in
-    if (f = af) then []
-    else destr_and_l' (aux @ [a]) af
-  in
-  destr_and_l' []
 
 (* -------------------------------------------------------------------- *)
 (* ------------------- Declassification (</) -------------------------- *)
@@ -226,14 +133,6 @@ let process_declassify oside tc =
   | None -> tc_error !!tc "conclusion is not hoare or bounded hoare"
 
 (* -------------------------------------------------------------------- *)
-(* ------------------- Undeclassification (</) ------------------------ *)
-(* -------------------------------------------------------------------- *)
-
-(* -------------------------------------------------------------------- *)
-let process_undeclassify oside tc =
-  tc_error !!tc "undeclassify tactic not yet implemented"
-
-(* -------------------------------------------------------------------- *)
 (* ------------------- Secure sampling (</$) -------------------------- *)
 (* -------------------------------------------------------------------- *)
 
@@ -261,11 +160,7 @@ let secrnd_hoare_r m s tc =
   let et = e_tuple [e_sv; e_odistr; e_secret] in
   let assignment = s_asgn (lv, et) in
   
-(*   Printf.printf "assign lvalue is: %s %s\n" (lvalue_to_string lv) (EcPath.tostring (psymbol (symbol_of_lv lv))); *)
-(*   Printf.printf "assign rvalue is: %s\n" (expr_to_string et); *)
-  
-  (* TODO: Additionally, we need the distribution not to be a singleton *)
-  
+  (* TODO: Additionally, we need the distribution not to be a singleton? *)
   let s' = s_seq s' sampling in
   let s' = s_seq s' assignment in
   s'
@@ -333,8 +228,6 @@ let t_equiv_secrndasgn_r tc =
   let (r_lv, r_leakable), r_s = tc1_last_secasgn tc es.es_sr in
 
   let (a_lv, distr), l_s = tc1_last_secrnd tc l_s in
-  let dty = e_ty distr in
-  let ty_distr = proj_distr_ty env dty in
   
   let l_ty_leakable = fun i -> proj_leakable_ty env i (e_ty l_leakable) in
   let r_ty_leakable = fun i -> proj_leakable_ty env i (e_ty r_leakable) in
@@ -343,7 +236,6 @@ let t_equiv_secrndasgn_r tc =
   let l_e_inst = e_proj l_leakable 0 (l_ty_leakable 0) in
   let l_assignment = s_secasgn (l_lv, l_leakable) in
   
-(*   let r_e_inst = e_proj r_leakable 0 (r_ty_leakable 0) in *)
   let r_assignment = s_secasgn (r_lv, r_leakable) in
   
   (* Create a variable matching the value of the already filled map *)
@@ -379,16 +271,9 @@ let t_equiv_secrndasgn_r tc =
   let f_distr = form_of_expr (fst es.es_ml) distr in
   
   (* TODO: we should not add inv_v if it is already amongst the post *)
-  let andl = destr_and_l es.es_po in
-  
   let secret_v = f_is_secret (l_e_inst.e_ty) v in
   let distr_v = f_sampled_from env f_distr (form_of_expr (fst es.es_ml) l_leakable) in
   let inv_v =
-(*     Printf.printf "r_idx = %s : %s\n" (expr_to_string r_idx) (dump_ty r_idx.e_ty); *)
-(*     Printf.printf "l_e = %s : %s\n" (expr_to_string l_e) (dump_ty l_e.e_ty); *)
-(*     Printf.printf "r_e = %s : %s\n" (expr_to_string r_e) (dump_ty r_e.e_ty); *)
-(*     Printf.printf "l = %s : %s\n" (expr_to_string l_leakable) (dump_ty l_leakable.e_ty); *)
-(*     Printf.printf "r = %s : %s\n" (expr_to_string r_leakable) (dump_ty r_leakable.e_ty); *)
     f_secrndasgn_invariant_fmap
       r_idx.e_ty
       (r_ty_leakable 0)
@@ -400,7 +285,6 @@ let t_equiv_secrndasgn_r tc =
   let post = f_and_simpl inv_v post in
   
   let secrecy = f_equivS_r { es with
-(*     es_ml = m; *)
     es_sl=l_s;
     es_sr=r_s;
     es_pr=pre;
@@ -408,7 +292,6 @@ let t_equiv_secrndasgn_r tc =
   } in
   
   let concl = f_equivS_r { es with
-(*     es_ml = m; *)
     es_sl=l_s';
     es_sr=r_s';
     es_pr=pre;
