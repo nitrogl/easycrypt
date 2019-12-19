@@ -98,7 +98,7 @@ module PRPExp(P1: PRP, P2: PRP, D: SPRPDist) = {
  *)
 require (*--*) Strong_RP_RF.
 clone import Strong_RP_RF as SRPRF with
-  op q = q, (* outside of EC, we assume that q is a polynomial bound *)
+  op q <- q, (* outside of EC, we assume that q is a polynomial bound *)
   type K <- K,
   type D <- D,
 
@@ -316,7 +316,7 @@ section PRPSecurity.
 
   lemma prp_polybound_randomperm (D<: SPRPDist{RP,SPRPO,RFP,PRPi.PRPi,FOracleCallsCounter}) &m:
     (forall (O<: PRPt.Oracles{D}), islossless O.f => islossless O.fi => islossless D(O).distinguish) =>
-    `| Pr[IndSPRP(RP, FOracleCallsCounter(D)).main() @ &m : res] - Pr[IndSPRP(RFP, FOracleCallsCounter(D)).main() @ &m : res] | <= (q^2)%r * mu1 dD witness.
+    `| Pr[IndSPRP(RP, FOracleCallsCounter(D)).main() @ &m : res] - Pr[IndSPRP(RFP, FOracleCallsCounter(D)).main() @ &m : res] | <= (q^2 - q)%r / 2%r * mu1 dD witness.
   proof.
     move => Ddistinguish_ll; rewrite (prp_polybound_randomperm_ind_eq D &m) (prp_polybound_almost_randomperm_ind_eq D &m);
     apply (SRPRF.Conclusion D &m) => //.
@@ -461,7 +461,7 @@ section PRPSecurity.
 
   lemma prpexpo_polybound_randomperm (D<: SPRPDist{RP,SPRPO,RFP,PRPi.PRPi,FOracleCallsCounter}) &m:
     (forall (O<: SPRPOracleAccess{D}), islossless O.f => islossless O.fi => islossless D(O).distinguish) =>
-    `| Pr[IndSPRP(RP, FOracleCallsCounter(D)).main() @ &m : res] - Pr[IndSPRP(RFP, FOracleCallsCounter(D)).main() @ &m : res] | <= (q^2)%r * mu1 dD witness.
+    `| Pr[IndSPRP(RP, FOracleCallsCounter(D)).main() @ &m : res] - Pr[IndSPRP(RFP, FOracleCallsCounter(D)).main() @ &m : res] | <= (q^2 - q)%r / 2%r * mu1 dD witness.
   proof.
     move => Ddistinguish_ll; rewrite (prp_polybound_randomperm_ind_eq D &m) (prp_polybound_almost_randomperm_ind_eq D &m).
     apply (Conclusion D &m) => //.
@@ -483,7 +483,7 @@ section PRPSecurity.
 
   lemma prpexpo_ind_eq (D<: SPRPDist{RP,RFP,PRPi.PRPi,SPRPO,FOracleCallsCounter}) &m:
     (forall (O<: SPRPOracleAccess{D}), islossless O.f => islossless O.fi => islossless D(O).distinguish) =>
-    Pr[PRPExpO(RP, RFP, FOracleCallsCounter(D)).main() @ &m : res] <= inv 2%r + (q^2)%r * mu1 dD witness / 2%r.
+    Pr[PRPExpO(RP, RFP, FOracleCallsCounter(D)).main() @ &m : res] <= inv 2%r + (q^2 - q)%r / 2%r * mu1 dD witness / 2%r.
   proof.
     move => *.
     have co_RP_ll: islossless FOracleCallsCounter(D, RP).distinguish.
@@ -495,7 +495,7 @@ section PRPSecurity.
     move : (prpexpo_polybound_randomperm D &m _) => //.
     rewrite -(prpexpo_advantage_ind_rp_rfp D &m _ _) => //.
     pose m := Pr[PRPExpO(RP, RFP, FOracleCallsCounter(D)).main() @ &m : res];
-    pose k := (q^2)%r * mu1 dD witness.
+    pose k := (q^2 - q)%r / 2%r * mu1 dD witness.
     smt.
   qed.
 
@@ -599,42 +599,140 @@ section PRPSecurity.
    *  - both memories are empty (only to enforce prob distro to elements), and
    *  - the attacker does not have access to the internal of the functions and the oracle (obviously).
    *)
-  lemma ind_rp_inf_rkp_eq (D<: PRFDist{RP,RandomKeyedPermutation,PRPO}) &m:
-    equiv[IndSPRP(RP, D).main ~ IndSPRP(PRPO(RandomKeyedPermutation), D).main : ={glob D} /\ RP.m{1} = empty /\ RandomKeyedPermutation.m{2} = empty ==> ={res}].
+  lemma ind_rp_inf_rkp_eq (D<: SPRPDist{RP,RandomKeyedPermutation,PRPO}) &m:
+    equiv[IndSPRP(RP, D).main ~ IndSPRP(PRPO(RandomKeyedPermutation), D).main : ={glob D} /\ RP.m{1} = empty /\ RandomKeyedPermutation.m{2} = empty /\ RP.mi{1} = empty /\ RandomKeyedPermutation.mi{2} = empty ==> ={res}].
   proof.
     proc; inline*.
-    call (_: (forall x, RP.m{1}.[x] = RandomKeyedPermutation.m{2}.[(PRPO.k{2}, x)])
+    call (_:
+         (forall x, RP.m{1}.[x] = RandomKeyedPermutation.m{2}.[(PRPO.k{2}, x)])
+      /\ (forall x, RP.mi{1}.[x] = RandomKeyedPermutation.mi{2}.[(PRPO.k{2}, x)])
       /\ rng RP.m{1} = rng RandomKeyedPermutation.m{2}
-      /\ forall kx, RandomKeyedPermutation.m{2}.[kx] <> None => fst kx = PRPO.k{2}).
+      /\ rng RP.mi{1} = rng RandomKeyedPermutation.mi{2}
+      /\ (forall kx, RandomKeyedPermutation.m{2}.[kx] <> None => fst kx = PRPO.k{2})
+      /\ (forall kx, RandomKeyedPermutation.mi{2}.[kx] <> None => fst kx = PRPO.k{2})
+    ) => //.
     + proc; inline*; sp; wp; if; first by progress; move : (H x{2}); smt.
       * (* then *)
-        wp; rnd; skip; progress; first 4 by smt.
-        pose m1  := RP.m{1};
-        pose m2  := RandomKeyedPermutation.m{2};
-        pose m1u := m1.[x{2} <- yL];
-        pose m2u := m2.[(PRPO.k{2}, x{2}) <- yL].
-        rewrite rng_frng_eq fsetP; move => y.
-        split.
-        - (* => *)
-          rewrite mem_frng rngE /=.
-          move => [x' img].
-          rewrite mem_frng rngE /=.
-          exists (PRPO.k, x'){2}.
-          rewrite eq_sym -img.
-          case (x' = x{2}) => x_x'.
-          + rewrite x_x' 2!get_set_sameE //.
-          + rewrite get_set_neqE // get_set_neqE // H //.
-        - (* <= *)
-          rewrite mem_frng rngE /=.
-          move => [kx img].
-          have [x' kx_x']: exists x', kx = (PRPO.k, x'){2} by exists (snd kx); smt.
-          rewrite mem_frng rngE /=.
-          exists x'.
-          rewrite eq_sym -img kx_x'.
-          case (x' = x{2}) => x_x'.
-          + rewrite x_x' 2!get_set_sameE //.
-          + rewrite get_set_neqE // get_set_neqE // H //.
-        smt. (* last of the progress call *)
+        wp; rnd; skip; progress.
+        - smt.
+        - smt.
+        - smt.
+        - smt.
+        - smt.
+        - pose m1  := RP.m{1};
+          pose m2  := RandomKeyedPermutation.m{2};
+          pose m1u := m1.[x{2} <- yL];
+          pose m2u := m2.[(PRPO.k{2}, x{2}) <- yL].
+          rewrite rng_frng_eq fsetP; move => y.
+          split.
+          + (* => *)
+            rewrite mem_frng rngE /=.
+            move => [x' img].
+            rewrite mem_frng rngE /=.
+            exists (PRPO.k, x'){2}.
+            rewrite eq_sym -img.
+            case (x' = x{2}) => x_x'.
+            * rewrite x_x' 2!get_set_sameE //.
+            * rewrite get_set_neqE // get_set_neqE // H //.
+          + (* <= *)
+            rewrite mem_frng rngE /=.
+            move => [kx img].
+            have [x' kx_x']: exists x', kx = (PRPO.k, x'){2} by exists (snd kx); smt.
+            rewrite mem_frng rngE /=.
+            exists x'.
+            rewrite eq_sym -img kx_x'.
+            case (x' = x{2}) => x_x'.
+            * rewrite x_x' 2!get_set_sameE //.
+            * rewrite get_set_neqE // get_set_neqE // H //.
+        - pose m1  := RP.mi{1};
+          pose m2  := RandomKeyedPermutation.mi{2};
+          pose m1u := m1.[x{2} <- yL];
+          pose m2u := m2.[(PRPO.k{2}, x{2}) <- yL].
+          rewrite rng_frng_eq fsetP; move => y.
+          split.
+          + (* => *)
+            rewrite mem_frng rngE /=.
+            move => [x' img].
+            rewrite mem_frng rngE /=.
+            exists (PRPO.k, x'){2}.
+            rewrite eq_sym -img.
+            case (x' = yL) => yL_x'.
+            * rewrite yL_x' 2!get_set_sameE //.
+            * rewrite get_set_neqE // get_set_neqE // H0 //.
+          + (* <= *)
+            rewrite mem_frng rngE /=.
+            move => [kx img].
+            have [x' kx_x']: exists x', kx = (PRPO.k, x'){2} by exists (snd kx); smt.
+            rewrite mem_frng rngE /=.
+            exists x'.
+            rewrite eq_sym -img kx_x'.
+            case (x' = yL) => yL_x'.
+            * rewrite yL_x' 2!get_set_sameE //.
+            * rewrite get_set_neqE // get_set_neqE // H0 //.
+        - smt.
+        - smt.
+      * (* else *)
+        skip; progress; smt.
+    + proc; inline*; sp; wp; if => //=; first by progress; move : (H0 x{2}); smt.
+      * (* then *)
+        wp; rnd; skip; progress.
+        - smt.
+        - smt.
+        - smt.
+        - smt.
+        - smt.
+        - pose m1  := RP.m{1};
+          pose m2  := RandomKeyedPermutation.m{2};
+          pose m1u := m1.[xL <- y{2}];
+          pose m2u := m2.[(PRPO.k{2}, xL) <- y{2}].
+          rewrite rng_frng_eq fsetP; move => x.
+          split.
+          + (* => *)
+            rewrite mem_frng rngE /=.
+            move => [x' img].
+            rewrite mem_frng rngE /=.
+            exists (PRPO.k, x'){2}.
+            rewrite eq_sym -img.
+            case (x' = xL) => xL_x'.
+            * rewrite xL_x' 2!get_set_sameE //.
+            * rewrite get_set_neqE // get_set_neqE // H //.
+          + (* <= *)
+            rewrite mem_frng rngE /=.
+            move => [kx img].
+            have [x' kx_x']: exists x', kx = (PRPO.k, x'){2} by exists (snd kx); smt.
+            rewrite mem_frng rngE /=.
+            exists x'.
+            rewrite eq_sym -img kx_x'.
+            case (x' = xL) => xL_x'.
+            * rewrite xL_x' 2!get_set_sameE //.
+            * rewrite get_set_neqE // get_set_neqE // H //.
+        - pose m1  := RP.mi{1};
+          pose m2  := RandomKeyedPermutation.mi{2};
+          pose m1u := m1.[y{2} <- xL];
+          pose m2u := m2.[(PRPO.k{2}, y{2}) <- xL].
+          rewrite rng_frng_eq fsetP; move => x.
+          split.
+          + (* => *)
+            rewrite mem_frng rngE /=.
+            move => [y' img].
+            rewrite mem_frng rngE /=.
+            exists (PRPO.k, y'){2}.
+            rewrite eq_sym -img.
+            case (y' = y{2}) => y_y'.
+            * rewrite y_y' 2!get_set_sameE //.
+            * rewrite get_set_neqE // get_set_neqE // H0 //.
+          + (* <= *)
+            rewrite mem_frng rngE /=.
+            move => [kx img].
+            have [y' kx_x']: exists y', kx = (PRPO.k, y'){2} by exists (snd kx); smt.
+            rewrite mem_frng rngE /=.
+            exists y'.
+            rewrite eq_sym -img kx_x'.
+            case (y' = y{2}) => y_y'.
+            * rewrite y_y' 2!get_set_sameE //.
+            * rewrite get_set_neqE // get_set_neqE // H0 //.
+        - smt.
+        - smt.
       * (* else *)
         skip; progress; smt.
     + wp; rnd{2}; skip; progress; smt.

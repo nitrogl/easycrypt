@@ -19,6 +19,9 @@ require import FSet.
 require (* -- *) NewPRF.
 require (* -- *) IdealPRF.
 
+(* bound *)
+op q: { int | 0 <= q } as q_ge0.
+
 type K.
 type D.
 type R.
@@ -46,11 +49,33 @@ clone import IdealPRF as PRFi with
 
   op dK <- dK,
   op dR <- dR
-rename "RandomFunction" as "RF"
+rename "RandomFunction" as "SimpleRF"
 rename "PRF_Distinguisher" as "PRFDist"
 rename "PRF_Oracles" as "PRFOracle"
 rename "PRF_Oracle" as "PRFOracleAccess"
 rename "IND" as "IndPRF".
+
+module RF = {
+  var collisions: bool
+  var m: (D, R) fmap
+
+  proc init() = {
+    m <- empty;
+    collisions <- false;
+  }
+
+  proc f(x: D): R = {
+    var v;
+
+    if (!dom m x) {
+      v <$ dR;
+      collisions <- collisions \/ rng m v;
+      m.[x] <- v;
+    }
+
+    return oget m.[x];
+  }
+}.
 
 theory PRFOracle.
   module PRFO(F: PRF): PRFOracle = {
@@ -309,12 +334,130 @@ section PRFSecurity.
     proc; inline*.
     call (_: forall x, RF.m{1}.[x] = RandomKeyedFunction.m{2}.[(PRFO2.k{2}, x)]).
     + proc. inline*. sp; wp; if; first by progress; move : (H x{2}); smt.
-      + (* else *) rnd; skip; progress; smt.
+      + (* else *) wp; rnd; skip; progress; smt.
     + skip; progress; smt.
     wp; rnd{2}; skip; progress; smt.
   qed.
 
 end section PRFSecurity.
 
+section PRFCollisions.
+  (*
+   * BoundedRRFD contains an attacker and a bounded function counter
+   * wrapping the random function RF that is aware of
+   * how many times it has been called on f.
+   *)
+  module BoundedRFD(D: PRFDist, OA: PRFOracleAccess) = {
+    var calls: int
+
+    module BRF = {
+      proc init() = {
+        RF.init();
+        calls <- 0;
+      }
+
+      proc f(x: D): R = {
+        var v = witness;
+
+        if (calls < q) {
+          (* elements in m less than q *)
+          if (card (frng RF.m) < q) {
+            v <- RF.f(x);
+          }
+          calls <- calls + 1;
+        }
+
+        return v;
+      }
+    }
+
+    proc distinguish() = {
+      var b;
+
+      BRF.init();
+      b <@ D(BRF).distinguish();
+
+      return b;
+    }
+  }.
+
+  (*
+   * We can distinguish between the two as soon as either
+   * - we find a collision, or
+   * - we reach the maximum number of allowed calls.
+   * (adaptation to random function from random permutations)
+   *)
+  require import FelTactic.
+  require import SmtMapExt.
+  require import Mu_mem.
+  (*---*) import StdBigop StdRing StdOrder IntExtra RealExtra.
+  (*---*) import Bigreal.BRA RField RField.AddMonoid IntOrder.
+
+  lemma brfd_collision_bound (D<: PRFDist{RF,BoundedRFD}) &m:
+    is_full dR =>
+    is_uniform dR =>
+    Pr[IndPRF(RF, BoundedRFD(D)).main() @ &m : RF.collisions] <= (q^2 - q)%r / 2%r * mu dR (pred1 witness).
+  proof.
+    move => dR_fu dR_un.
+    have ->:   Pr[IndPRF(RF, BoundedRFD(D)).main() @ &m : RF.collisions]
+            = Pr[IndPRF(RF, BoundedRFD(D)).main() @ &m : RF.collisions /\ BoundedRFD.calls <= q].
+      byequiv => //=.
+      conseq (_: ={glob D} ==> ={RF.collisions, BoundedRFD.calls})
+             (_: true ==> BoundedRFD.calls <= q) => //=.
+      * proc; inline *; wp; call (_: BoundedRFD.calls <= q).
+        - proc; inline*; sp; if => //=; auto => //; sp; if => //=; auto => //.
+          * sp; if => //=; auto => /#.
+          * progress; smt. 
+        - wp; skip; progress; apply/q_ge0.
+      * sim.
+    have ->:   Pr[IndPRF(RF, BoundedRFD(D)).main() @ &m : RF.collisions /\ BoundedRFD.calls <= q]
+            = Pr[BoundedRFD(D, RF).distinguish() @ &m: RF.collisions /\ BoundedRFD.calls <= q].
+      byequiv=> //=; proc; inline *; wp.
+      call (_: ={glob RF, BoundedRFD.calls} /\ card (frng RF.m){1} <= BoundedRFD.calls{2}).
+      * proc; inline*; sp; if=> //=; sp; if => //.
+        - sp; if => //.
+          + wp; rnd; skip; progress.
+            apply/(ler_trans (card (frng RF.m{2} `|` fset1 v0L))).
+              apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
+              rewrite get_setE; case: (x0 = x{2})=> [<<- /= ->|_ mx0] //.
+              by left; exists x0.
+            smt.
+          + wp; skip; progress; smt.
+      * wp; skip; progress; smt.
+      wp; skip; progress; smt.
+    fel 1 BoundedRFD.calls (fun x, x%r * mu dR (pred1 witness)) q (RF.collisions) 
+           [BoundedRFD(D, RF).BRF.f: (BoundedRFD.calls < q)]
+           (card (fdom RF.m) <= BoundedRFD.calls) => //.
+    + rewrite -mulr_suml Bigreal.sumidE 1:q_ge0. 
+      by rewrite (powS 1) // pow1;smt(mu_bounded q_ge0).
+    + by inline*; auto=> />; rewrite fdom0 fcards0.
+    + exists* BoundedRFD.calls; elim *=> c.
+      conseq(:_==>_ : (c%r * mu1 dR witness))=> />.
+      proc; sp; rcondt 1=> //.
+      inline *; sp; if=> //=; last first.
+      * hoare; auto=> // /> &hr _ _ _ _ _ .
+        by apply/RealOrder.mulr_ge0; smt w=(mu_bounded q_ge0).
+      * sp; if => //=.
+        + wp; rnd (rng RF.m); skip; progress.
+          - apply/(RealOrder.ler_trans ((card (frng RF.m{hr}))%r * mu dR (pred1 witness))).
+              have ->: rng RF.m{hr} = mem (frng RF.m{hr}) by apply/fun_ext=> x; rewrite mem_frng.
+              apply/mu_mem_le.
+              move=> x _; apply/RealOrder.lerr_eq.
+              rewrite (dR_un x witness) => //; by rewrite dR_fu.
+            by apply/RealOrder.ler_wpmul2r; smt w=(mu_bounded lt_fromint ltrW le_card_frng_fdom).
+          - move: H8; rewrite H1 //.
+        + by hoare; auto=> //=; smt w=(RealOrder.mulr_ge0 mu_bounded q_ge0).
+    + move=> c; proc; rcondt 2; 1:by auto.
+      sp; if=> //=.
+      * inline*;sp;if;auto; 2:smt().
+        move=> &hr /> + + + + y />.
+        by rewrite !fdom_set !fcardU !fcard1; smt(fcard_ge0).
+      * by auto=> /#.
+    + by move=> b c; proc; rcondf 2; auto.
+  qed.
+
+end section PRFCollisions.
+
 print prfexp_advantage_ind_alt.
 print ind_rf_inf_rkf_eq.
+print brfd_collision_bound.
