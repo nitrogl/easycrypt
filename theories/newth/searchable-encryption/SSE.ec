@@ -19,43 +19,43 @@ require (*--*) Lazy NewROM.
 theory SearchableSymmetricEncryption.
   type key.
   type query. (* search is a keyword in EC, so here "query" is used as synonym of "search query" *)
-  type mapquery.
-  type stoken.
-  type utoken.
+  type mapquery. (* when the queries are transformed or mapped *)
   type index.
-  type operation.
-  type storage = (index, query list) fmap.
-  type encryptedstorage.
+  type storage = (index, query list) fmap. (* database of indexes *)
+  type encryptedstorage. (* the real database with files *)
   type state.
   type setupserver.
+  type client_update_out.
+  type client_query_out.
+  type server_query_out.
+  const empty_out : server_query_out.
 
   (* Some common operations *)
-  const ADD: operation.
-  const DEL: operation.
+  type sse_protocol = [ UPDATE | SEARCH ].
+  type operation = [ ADD | DEL ].
+  type operationinput.
+  op extract_query (o: operation) (oargs: operationinput) : query.
+  op extract_index (o: operation) (oargs: operationinput) : index.
 
   (* distributions *)
   op dkey: key distr.
-  op dstoken: stoken distr.
   op dmapquery: mapquery distr.
-  op dutoken: utoken distr.
 
   (* Generating random queries *)
-  type updateinput = (operation * query * index).
-  op dupdate: updateinput distr.
+  op dupdate: (operation * operationinput) distr.
   op dquery: query distr.
-
-  const  SETUP = 0.
-  const UPDATE = 1.
-  const SEARCH = 2.
 
   (** match returns all the (file) indexes matching some query *)
   op match (db: storage) (q: query): index list = elems (fdom (filter (fun _ => has ((=) q)) db)).
 
+  (** final result is the list of indexes *)
+  op elaborate_indexes (so: server_query_out) : index list.
+
   (** history lists "timed" database snapshots with queries *)
-  type updateevent = storage * updateinput.
+  type updateevent = storage * (operation * operationinput).
   type queryevent  = storage * query.
   type event = storage *
-      updateinput option (* update *)
+      (operation * operationinput) option (* update *)
     * query option.                      (* search *)
   type updatehistory = (int * updateevent) list.
   type queryhistory = (int * queryevent) list.
@@ -64,12 +64,11 @@ theory SearchableSymmetricEncryption.
   (** Operations for high level understanding *)
   op eup_storage   (e: updateevent) = fst e.
   op eup_input     (e: updateevent) = snd e.
-  op eup_operation (e: updateevent) = (eup_input e).`1.
-  op eup_query     (e: updateevent) = (eup_input e).`2.
-  op eup_index     (e: updateevent) = (eup_input e).`3.
-  op up_operation  (i: updateinput) = i.`1.
-  op up_query     (i: updateinput) = i.`2.
-  op up_index     (i: updateinput) = i.`3.
+  op eup_operation (e: updateevent) = fst (eup_input e).
+  op eup_query     (e: updateevent) : query.
+  op eup_index     (e: updateevent) : index.
+  op up_query     (i: operationinput) : query.
+  op up_index     (i: operationinput) : index.
   op eq_storage   (e: queryevent) = fst e.
   op eq_query     (e: queryevent) = snd e.
   op ev_storage (e: event) = e.`1.
@@ -97,7 +96,7 @@ theory SearchableSymmetricEncryption.
                                                    (filter (fun (e: int * event) => oh_query e <> None) h).
 
   (** Subset of the history regarding some specific query *)
-  op hist (h: history) (q: query): history = filter (fun (e: int * event) => (oh_update e <> None /\ up_query (h_update e) = q) \/ oh_query e = Some q) h.
+  op hist (h: history) (q: query): history = filter (fun (e: int * event) => (oh_update e <> None /\ up_query (snd (h_update e)) = q) \/ oh_query e = Some q) h.
   op lastdb (h: history): storage = (h = []) ? empty : h_storage (nth witness h (size h - 1)).
 
   (** Access pattern with history for each search queries ad updates, then mixed *)
@@ -143,15 +142,22 @@ theory SearchableSymmetricEncryption.
 
   module type SSELeakage = {
     proc leakSetup(_: unit): Lsetup
-    proc leakUpdate(o: operation, q: query, i: index): Lupdate
+    proc leakUpdate(o: operation, oin: operationinput): Lupdate
     proc leakQuery(q: query): Lquery
   }.
 
   (** Trace collects, with respect to initial setupserver, input and output of update, search, and oracle calls *)
+  type update_view. (* ((operation * operationinput) * client_update_out option)  *)
+  type query_view. (* (query * client_query_out option * server_query_out) *)
+  type update_trace = (operation * operationinput) * update_view.
+  type query_trace = query * query_view.
   type trace = (setupserver, (
-      ((updateinput * (utoken * index) option) option)  (* update *)
-    * ((query * (mapquery * stoken * int) option * index list) option) (* search *)
+      (update_trace option)  (* update *)
+    * (query_trace option) (* search *)
   ) list) fmap.
+  op trace_add_update (s: setupserver) (ut: update_trace) (t: trace): trace.
+  op trace_add_query (s: setupserver) (qt: query_trace) (t: trace): trace.
+  op extract_result (qv: query_view) : server_query_out.
 
   (*
    * To support proofs in the ROM, we make oracles out of SSE schemes.
@@ -163,15 +169,15 @@ theory SearchableSymmetricEncryption.
 
     module type SSEOracle = {
       proc init()    : unit
-      proc update(o: operation, q: query, i: index): (utoken * index) option
-      proc query(q: query): (mapquery * stoken * int) option * index list
+      proc update(o: operation, oin: operationinput): update_view
+      proc query(q: query): query_view
       proc o (x: int * sseo_args_t): sseo_res_t option
     }.
 
     (* Adversaries are restricted to update, query, or customised o access *)
     module type SSEAccess = {
-      proc update(o: operation, q: query, i: index): (utoken * index) option
-      proc query(q: query): (mapquery * stoken * int) option * index list
+      proc update(o: operation, oin: operationinput): update_view
+      proc query(q: query): query_view
       proc o(x: int * sseo_args_t): sseo_res_t option
     }.
 
@@ -183,74 +189,36 @@ theory SearchableSymmetricEncryption.
   import SSEOracleTheory.
 
   (**
-   * SSE scheme includes three protocols: setup, update, and query (aka search).
+   * SSE scheme includes three procedures: setup, update, and query (aka search).
    *
    * The additional procedure "o" may not enjoy any real implementation: In such a case, the simple constant "None" can be safely returned.
    *)
   module type SSEClient = {
     proc setup(): setupserver
-    proc update(o: operation, q: query, i: index): (utoken * index) option
-    proc query(q: query): (mapquery * stoken * int) option
+    proc update(o: operation, oin: operationinput): client_update_out option
+    proc query(q: query): client_query_out option
     proc o(oin: int * sseo_args_t): sseo_res_t option
   }.
 
   module type SSEServer = {
     proc setup(s: setupserver): unit
-    proc update(o: operation, t: utoken, i: index): unit
-    proc query(kw: mapquery, t: stoken, c: int): index list
+    proc update(o: operation, uin: client_update_out): unit
+    proc query(qin: client_query_out): server_query_out
   }.
 
   (* The scheme leaving all traces and exposes oracle access *)
   module type SSEScheme = {
     proc setup(): setupserver
-    proc update(o: operation, q: query, i: index): (utoken * index) option
-    proc query(q: query): (mapquery * stoken * int) option * index list
+    proc update(o: operation, oin: operationinput): update_view
+    proc query(q: query): query_view
     proc o(oin: int * sseo_args_t): sseo_res_t option
-  }.
-
-  module SSEProtocol(SC: SSEClient, SS: SSEServer): SSEScheme = {
-    proc setup(): setupserver = {
-      var ss;
-
-      ss <@ SC.setup();
-      SS.setup(ss);
-
-      return ss;
-    }
-
-    proc update(o: operation, q: query, i: index): (utoken * index) option = {
-      var t, idx, ti;
-
-      ti <@ SC.update(o, q, i);
-      if (ti <> None) {
-        (t, idx) = oget ti;
-        SS.update(o, t, idx);
-      }
-
-      return ti;
-    }
-
-    proc query(q: query): (mapquery * stoken * int) option * index list = {
-      var qo, rl;
-
-      qo <@ SC.query(q);
-      if (qo = None) {
-        rl = [];
-      } else {
-        rl <@ SS.query(oget qo);
-      }
-
-      return (qo, rl);
-    }
-
-    proc o = SC.o
   }.
 
   (* First try - It looks more difficult to prove than many other protocols. *)
   module Correctness(S: SSEScheme) = {
     proc main(n: int): bool = {
-      var r, i, b, msg, queryres;
-      var o, q, ind;
+      var r, i, b, queryres, idxs;
+      var o, oargs, q, ind, qv;
       var db: storage;
 
       S.setup();
@@ -260,21 +228,37 @@ theory SearchableSymmetricEncryption.
       i <- 0;
       while (i < n) {
         b <$ {0,1};
-        if (b) {
-          (o, q, ind) <$ dupdate;
-          S.update(o, q, ind);
+        if (b) { (* b - UPDATE *)
+          (o, oargs) <$ dupdate;
+          S.update(o, oargs);
           if (o = ADD) {
             (* store the updates in clear *)
+              q <- extract_query ADD oargs;
+            ind <- extract_index ADD oargs;
             if (!(dom db ind)) {
               db.[ind] <- [q];
             } else {
               db.[ind] <- (oget db.[ind]) ++ [q];
             }
+          } else {
+            if (o = DEL) {
+                q <- extract_query DEL oargs;
+              ind <- extract_index DEL oargs;
+              if (!(dom db ind)) {
+                db.[ind] <- [];
+              } else {
+                db.[ind] <- rem q (oget db.[ind]);
+              }
+            }
           }
-        } else {
+        } else { (* ¬b - SEARCH *)
           q <$ dquery;
-          (msg, queryres) <@ S.query(q);
-          r <- r /\ perm_eq queryres (match db q);
+          qv <@ S.query(q);
+          queryres <- extract_result qv;
+          if (queryres <> empty_out) {
+            idxs <- elaborate_indexes queryres;
+            r <- r /\ perm_eq idxs (match db q);
+          }
         }
       }
 
@@ -285,15 +269,15 @@ theory SearchableSymmetricEncryption.
   (** Simulator *)
   module type SSESimulator = {
     proc setup(ls: Lsetup): setupserver
-    proc update(lu: Lupdate): (utoken * index) option
-    proc query(lq: Lquery): (mapquery * stoken * int) option * index list
+    proc update(lu: Lupdate): update_view
+    proc query(lq: Lquery): query_view
     proc o(oin: int * sseo_args_t): sseo_res_t option
   }.
 
   (** Adaptive distinguisher. It distiguishes by the trace of execution *)
   module type SSEDist = {
-    proc adaptiveUorQ(t: trace): int (* what's next? update query or search query? *)
-    proc sortInputsU(): operation * query * index
+    proc adaptiveUorQ(t: trace): sse_protocol (* what's next? update query or search query? *)
+    proc sortInputsU(): operation * operationinput
     proc sortInputsQ(): query
     proc distinguish(t: trace): bool
   }.
@@ -306,7 +290,7 @@ theory SearchableSymmetricEncryption.
   module SSEExperiment(S1: SSEScheme, S2: SSEScheme, D: SSEDist) = {
 
     proc game(real: bool, n: int): bool = {
-      var g, i, iU, oU, iQ, oQ, oR, oS, t, what;
+      var g, i, iU, oU, iQ, oQ, oS, t, what;
 
       (* Setup games *)
       if (real) oS <@ S1.setup();
@@ -323,22 +307,22 @@ theory SearchableSymmetricEncryption.
           if (what = UPDATE) {
             iU <@ D.sortInputsU();
             oU <@ S1.update(iU);
-            t.[oS] <- oget t.[oS] ++ [(Some(iU, oU), None)];
+            t <- trace_add_update oS (iU, oU) t;
           } elif (what = SEARCH) {
             iQ <@ D.sortInputsQ();
-            (oQ, oR) <@ S1.query(iQ);
-            t.[oS] <- oget t.[oS] ++ [(None, Some(iQ, oQ, oR))];
+            oQ <@ S1.query(iQ);
+            t <- trace_add_query oS (iQ, oQ) t;
           }
         } else {
           what <@ D.adaptiveUorQ(t);
           if (what = UPDATE) {
             iU <@ D.sortInputsU();
             oU <@ S2.update(iU);
-            t.[oS] <- oget t.[oS] ++ [(Some(iU, oU), None)];
+            t <- trace_add_update oS (iU, oU) t;
           } elif (what = SEARCH) {
             iQ <@ D.sortInputsQ();
-            (oQ, oR) <@ S2.query(iQ);
-            t.[oS] <- oget t.[oS] ++ [(None, Some(iQ, oQ, oR))];
+            oQ <@ S2.query(iQ);
+            t <- trace_add_query oS (iQ, oQ) t;
           }
         }
         if (what = UPDATE \/ what = SEARCH) i = i + 1;
@@ -367,7 +351,7 @@ theory SearchableSymmetricEncryption.
   module SSELAdaptiveSecurity(S1: SSEScheme, S2: SSESimulator, L: SSELeakage, D: SSEDist) = {
       
     proc game(real: bool, n: int): bool = {
-      var g, i, iU, oU, iQ, oQ, oR, oS, t, what, ls, lu, lq;
+      var g, i, iU, oU, iQ, oQ, oS, t, what, ls, lu, lq;
 
       (* Setup games *)
       if (real) {
@@ -388,11 +372,11 @@ theory SearchableSymmetricEncryption.
           if (what = UPDATE) {
             iU <@ D.sortInputsU();
             oU <@ S1.update(iU);
-            t.[oS] <- oget t.[oS] ++ [(Some(iU, oU), None)];
+            t <- trace_add_update oS (iU, oU) t;
           } elif (what = SEARCH) {
             iQ <@ D.sortInputsQ();
-            (oQ, oR) <@ S1.query(iQ);
-            t.[oS] <- oget t.[oS] ++ [(None, Some(iQ, oQ, oR))];
+            oQ <@ S1.query(iQ);
+            t <- trace_add_query oS (iQ, oQ) t;
           }
         } else {
           what <@ D.adaptiveUorQ(t);
@@ -400,12 +384,12 @@ theory SearchableSymmetricEncryption.
             iU <@ D.sortInputsU();
             lu <@ L.leakUpdate(iU);
             oU <@ S2.update(lu);
-            t.[oS] <- oget t.[oS] ++ [(Some(iU, oU), None)];
+            t <- trace_add_update oS (iU, oU) t;
           } elif (what = SEARCH) {
             iQ <@ D.sortInputsQ();
             lq <@ L.leakQuery(iQ);
-            (oQ, oR) <@ S2.query(lq);
-            t.[oS] <- oget t.[oS] ++ [(None, Some(iQ, oQ, oR))];
+            oQ <@ S2.query(lq);
+            t <- trace_add_query oS (iQ, oQ) t;
           }
         }
         if (what = UPDATE \/ what = SEARCH) i = i + 1;
@@ -546,16 +530,16 @@ theory SearchableSymmetricEncryption.
       return output;
     }
     
-    proc update(o: operation, q: query, i: index): (utoken * index) option = {
+    proc update(o: operation, oin: operationinput): update_view = {
       var input, output;
       
-      input <@ L.leakUpdate(o, q, i);
+      input <@ L.leakUpdate(o, oin);
       output <@ S.update(input);
       
       return output;
     }
     
-    proc query(q: query): (mapquery * stoken * int) option * index list = {
+    proc query(q: query): query_view = {
       var input, output;
       
       input <@ L.leakQuery(q);
@@ -744,29 +728,25 @@ theory SearchableSymmetricEncryption.
   lemma sseexprom_dsse_left (S1<: SSEScheme) (S2<: SSEScheme) (D<: SSEDistROM{S1, S2}) &m:
     Pr[SSEExpROM(S1, S2, D).game(true) @ &m : res] = Pr[Dsse(D, S1).distinguish() @ &m : res].
   proof.
-    byequiv => //; proc; rcondt{1} 1; progress.
-    seq 2 2: (={g}) => //; sim.
+    byequiv => //; proc; rcondt{1} 1; progress; sim.
   qed.
 
   lemma sseexprom_dsse_right (S1<: SSEScheme) (S2<: SSEScheme) (D<: SSEDistROM{S1, S2}) &m:
     Pr[SSEExpROM(S1, S2, D).game(false) @ &m : res] = Pr[Dsse(D, S2).distinguish() @ &m : res].
   proof.
-    byequiv => //; proc; rcondf{1} 1; progress.
-    seq 2 2: (={g}) => //; sim.
+    byequiv => //; proc; rcondf{1} 1; progress; sim.
   qed.
 
   lemma sseladaptiveexprom_dsse (S1<: SSEScheme) (L<: SSELeakage) (S2<: SSESimulator{L}) (D<: SSEDistROM{S1, S2, L}) &m:
     Pr[SSELAdaptiveSecurityROM(S1, S2, L, D).game(true) @ &m : res] = Pr[Dsse(D, S1).distinguish() @ &m : res].
   proof.
-    byequiv => //; proc; rcondt{1} 1; progress.
-    seq 2 2: (={g}) => //; sim.
+    byequiv => //; proc; rcondt{1} 1; progress; sim.
   qed.
 
   lemma sseladaptiveexprom_dsim (S1<: SSEScheme) (L<: SSELeakage) (S2<: SSESimulator{L}) (D<: SSEDistROM{S1, S2, L}) &m:
     Pr[SSELAdaptiveSecurityROM(S1, S2, L, D).game(false) @ &m : res] = Pr[Dsim(D, S2, L).distinguish() @ &m : res].
   proof.
-    byequiv => //; proc; rcondf{1} 1; progress.
-    seq 2 2: (={g}) => //; sim.
+    byequiv => //; proc; rcondf{1} 1; progress; sim.
   qed.
 
 end SearchableSymmetricEncryption.
