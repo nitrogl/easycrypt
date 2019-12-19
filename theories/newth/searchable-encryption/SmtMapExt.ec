@@ -343,6 +343,13 @@ qed.
 (* Note that  *)
 op fmap_collision (m: ('a, 'b) fmap) = exists x y, dom m x /\ x <> y /\ m.[x] = m.[y].
 
+lemma coll0 ['a 'b]: !fmap_collision empty<: 'a, 'b>.
+proof.
+  rewrite /fmap_collision negb_exists /= => x.
+  rewrite negb_exists /= => y.
+  rewrite 2!emptyE /= negb_and domE emptyE //.
+qed.
+
 lemma coll_dom (m: ('a, 'b) fmap) x y:
   dom m x /\ x <> y /\ m.[x] = m.[y] => dom m y.
 proof.
