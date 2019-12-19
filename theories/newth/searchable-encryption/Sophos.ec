@@ -1,12 +1,12 @@
-
-
-(*
- * Sophos.
- *)(* --------------------------------------------------------------------
+(* --------------------------------------------------------------------
  * Copyright (c) - 2017--2018 - Roberto Metere <r.metere2@ncl.ac.uk>
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
+
+(*
+ * Sophos.
+ *)
 require import Core.
 require import TacticsExt.
 require import Bool.
@@ -14,7 +14,7 @@ require import Int.
 require import IntExtra.
 require import IntExt.
 require import LogicExt.
-require import Ring Real StdRing.
+require import Ring Real.
 require import RealExtra.
 require import Finite.
 require import DBool.
@@ -32,6 +32,7 @@ require import ListExt.
 require (*--*) HashFunction.
 require import SSE.
 require (*--*) BitWord.
+(*---*) import Ring.IntID.
 
 type stoken.
 type alpha.
@@ -481,7 +482,7 @@ section Sophos.
           wp; call H2hash_ll; wp; call H1hash_ll; skip; progress.
           + rewrite (lez_trans i{hr}) // -(lez_add2l (-i{hr})) addzA //.
           + rewrite lez_add2r //.
-          + rewrite IntID.opprD addzA /= -(ltz_add2l (- c{hr})) 3!addzA /= -(ltz_add2r (i{hr})) -addzA //.
+          + rewrite opprD addzA /= -(ltz_add2l (- c{hr})) 3!addzA /= -(ltz_add2r (i{hr})) -addzA //.
         wp; skip; progress.
         + rewrite (lez_trans c{hr}) // -(lez_add2l (-c{hr})) addzA //.
         + rewrite lezNgt /= -lez_add1r -(lez_add2r (-i0)) /= -addzA addzC; assumption.
@@ -4142,49 +4143,6 @@ progress.
   rewrite -concl //.
   qed.
 
-  local lemma ler_add2l (c a b: real): c + a <= c + b <=> a <= b by smt.
-
-  lemma anybad_or_inequality  (D <: SSEDistROM{RO2,RO1,RF,G4,G5,OracleCallsCounter}) &m:
-       Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : !(!G5_Client.bad_rf_coll /\ !G5_Client.bad_update_h1t /\ !G5_Client.bad_update_h2t /\ !G5_Client.bad_update_bt /\ !G5_Client.bad_h1 /\ !G5_Client.bad_h2)]
-    <= Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_rf_coll]
-    + Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_update_h1t]
-    + Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_update_h2t]
-    + Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_update_bt]
-    + Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_h1]
-    + Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_h2].
-  proof.
-    rewrite 5!negb_and 6!negbK -4!RField.addrA.
-    rewrite Pr[mu_or] -RField.addrA ler_add2l.
-    rewrite Pr[mu_or] -2!RField.addrA ler_add2l.
-    rewrite Pr[mu_or] -2!RField.addrA ler_add2l.
-    rewrite Pr[mu_or] -2!RField.addrA ler_add2l.
-    rewrite Pr[mu_or] -2!RField.addrA ler_add2l.
-    rewrite -RField.addr0 -RField.addrA ler_add2l.
-    rewrite /=; smt.
-  qed.
-
-  local lemma ler_trans (y x z: real): x <= y => y <= z => x <= z by smt.
-
-  lemma G4_G5_indistinguishable_uptobad_disjoint
-    (D <: SSEDistROM{RO2,RO1,RF,G4,G5,OracleCallsCounter}) &m:
-    (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-    (RO1.m, RO2.m){m} = (empty, empty) =>
-       Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(true) @ &m : res]
-    <= Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : res]
-    + Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_rf_coll]
-    + Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_update_h1t]
-    + Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_update_h2t]
-    + Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_update_bt]
-    + Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_h1]
-    + Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_h2].
-  proof.
-    move => oracle_termination_implies_distinguisher_termination empty_hashes.
-rewrite (ler_trans (Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : res] + Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : !(!G5_Client.bad_rf_coll /\ !G5_Client.bad_update_h1t /\ !G5_Client.bad_update_h2t /\ !G5_Client.bad_update_bt /\ !G5_Client.bad_h1 /\ !G5_Client.bad_h2)])).
-    apply (G4_G5_indistinguishable_uptobad D &m oracle_termination_implies_distinguisher_termination empty_hashes).
-    rewrite -5!RField.addrA ler_add2l 4!RField.addrA.
-    apply (anybad_or_inequality D &m).
-  qed.
-
   (*
    * === Part6 ===
    * We start not to handle the bad events, reducing to other experiments
@@ -4481,14 +4439,13 @@ rewrite (ler_trans (Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m
         + wp; skip; progress.
   qed.
 
-  local lemma G5_G6_indistinguishable_resnotbad
+  lemma G5_G6_indistinguishable_uptobad
     (D <: SSEDistROM{G5,G6,OracleCallsCounter}) &m:
     (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-    Pr[SSEExpROM(G5, G6, OracleCallsCounter(D)).game(true) @ &m : res /\ !G5_Client.bad_h2] <= Pr[SSEExpROM(G5, G6, OracleCallsCounter(D)).game(false) @ &m : res].
+    Pr[SSEExpROM(G5, G6, OracleCallsCounter(D)).game(false) @ &m : res] <= Pr[SSEExpROM(G5, G6, OracleCallsCounter(D)).game(true) @ &m : res] + Pr[SSEExpROM(G5, G6, OracleCallsCounter(D)).game(true) @ &m : G5_Client.bad_h2].
 proof.
 move => oracle.
 byequiv => //.
-symmetry.
 proc*.
 inline SSEExpROM(G5, G6, OracleCallsCounter(D)).game.
 rcondf{1} 2; first by progress; first by wp; skip; progress.
@@ -4647,7 +4604,7 @@ sp; if => //.
 wp; rnd; skip; progress.
 wp; skip; progress.
 swap{1} 1 12; swap{2} 1 12.
-wp => /=.
+wp.
 while (={kw0, i0, c0, t, glob OracleCallsCounter, glob RF, G4_Server.pk}
          /\   (G5_Client.et, G5_Client.utt, G5_Client.ws, G5_Client.h1t, G5_Client.sk, G5_Client.bad_rf_coll, G5_Client.bad_h1, G5_Client.bad_update_bt){2}
             = (G6_Client.et, G6_Client.utt, G6_Client.ws, G6_Client.h1t, G6_Client.sk, G6_Client.bad_rf_coll, G6_Client.bad_h1, G6_Client.bad_update_bt){1}
@@ -4708,7 +4665,7 @@ rewrite H0 //.
 rewrite (H pre) H5 //.
 wp; skip; progress; smt.
 
-wp => /=.
+wp.
 while ((0 <= i <= size sc){2}
          /\ ={kw, sc, i, q1, glob OracleCallsCounter, glob RF, G4_Server.pk}
          /\   (G5_Client.et, G5_Client.utt, G5_Client.ws, G5_Client.h1t, G5_Client.sk, G5_Client.bad_rf_coll, G5_Client.bad_h1, G5_Client.bad_update_bt){2}
@@ -4727,7 +4684,6 @@ smt.
 smt.
 smt.
 smt.
-+
 (*
  * The query call in the real world is required to terminate
  *)
@@ -4808,11 +4764,7 @@ sp; if => //.
 proc; sp; if => //; wp.
 inline*.
 sp; if => //.
-wp; sp; if => //.
-wp; sp; if => //.
-+ wp; skip; progress; smt.
-+ wp; rnd; progress; smt.
-
+sim; progress; smt.
 wp; if => //.
 wp; sp; if => //.
 progress; smt.
@@ -4820,7 +4772,7 @@ sp; if{2} => //.
 wp; rnd{1}; skip; progress; smt.
 wp; rnd; skip; progress; smt.
 skip; progress; smt.
-+
+
 (*
  * The o call in the real world is required to terminate
  *)
@@ -4860,44 +4812,11 @@ skip; progress.
 (*
  * No further procedures are left. Lastly, we need to prove that, in the meanwhile that the distinguisher does whatever she wants, the consistency, hence the indistinguishability, is kept in the case no bad events occur.
  *)
-simplify.
+
 wp; rnd; wp; skip; progress.
-move : (H1 H3).
+move : (H1 H2).
 move => [rwme] _.
-rewrite rwme //.
-  qed.
-
-  local lemma G5_G6_indistinguishable_uptoresbad
-    (D <: SSEDistROM{G5,G6,OracleCallsCounter}) &m:
-    (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-      Pr[SSEExpROM(G5, G6, OracleCallsCounter(D)).game(true) @ &m : res]
-    <= Pr[SSEExpROM(G5, G6, OracleCallsCounter(D)).game(false) @ &m : res]
-    + Pr[SSEExpROM(G5, G6, OracleCallsCounter(D)).game(true) @ &m : res /\ G5_Client.bad_h2].
-  proof.
-    move => oracle.
-    rewrite RField.addrC Pr[mu_split (G5_Client.bad_h2)] ler_add2l.
-    apply (G5_G6_indistinguishable_resnotbad D &m oracle).
-  qed.
-
-  lemma G5_G6_indistinguishable_uptobad
-    (D <: SSEDistROM{G5,G6,OracleCallsCounter}) &m:
-    (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-      Pr[SSEExpROM(G5, G6, OracleCallsCounter(D)).game(true) @ &m : res]
-    <= Pr[SSEExpROM(G5, G6, OracleCallsCounter(D)).game(false) @ &m : res]
-    + Pr[SSEExpROM(G5, G6, OracleCallsCounter(D)).game(true) @ &m : G5_Client.bad_h2].
-  proof.
-    move => oracle.
-    pose p5 := Pr[SSEExpROM(G5, G6, OracleCallsCounter(D)).game(true) @ &m : res].
-    pose p6 := Pr[SSEExpROM(G5, G6, OracleCallsCounter(D)).game(false) @ &m : res].
-    rewrite RField.addrC RField.addrC Pr[mu_split res] andbC.
-    pose prb := Pr[SSEExpROM(G5, G6, OracleCallsCounter(D)).game(true) @ &m : res /\ G5_Client.bad_h2].
-    rewrite andbC RField.addrA.
-    pose prCb := Pr[SSEExpROM(G5, G6, OracleCallsCounter(D)).game(true) @ &m : !res /\ G5_Client.bad_h2].
-    rewrite (ler_trans (p6 + prb)).
-    rewrite /p5 /p6 /prb.
-    apply (G5_G6_indistinguishable_uptoresbad D &m oracle).
-    rewrite -RField.addrA ler_add2l -RField.addr0 ler_add2l.
-    smt.
+rewrite -rwme //.
   qed.
 
   (*
@@ -5172,14 +5091,13 @@ rewrite rwme //.
         + wp; skip; progress.
   qed.
 
-  local lemma G6_G7_indistinguishable_resnotbad
-    (D <: SSEDistROM{G6,G7,OracleCallsCounter}) &m:
+  lemma G6_G7_indistinguishable_uptobad
+    (D <: SSEDistROM{RO2,RO1,RF,G6,G7,OracleCallsCounter}) &m:
     (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-    Pr[SSEExpROM(G6, G7, OracleCallsCounter(D)).game(true) @ &m : res /\ !G6_Client.bad_h1] <= Pr[SSEExpROM(G6, G7, OracleCallsCounter(D)).game(false) @ &m : res].
+    Pr[SSEExpROM(G6, G7, OracleCallsCounter(D)).game(false) @ &m : res] <= Pr[SSEExpROM(G6, G7, OracleCallsCounter(D)).game(true) @ &m : res] + Pr[SSEExpROM(G6, G7, OracleCallsCounter(D)).game(true) @ &m : G6_Client.bad_h1].
 proof.
 move => oracle.
 byequiv => //.
-symmetry.
 proc*.
 inline SSEExpROM(G6, G7, OracleCallsCounter(D)).game.
 rcondf{1} 2; first by progress; first by wp; skip; progress.
@@ -5524,42 +5442,9 @@ skip; progress.
  *)
 
 wp; rnd; wp; skip; progress.
-move : (H1 H3).
+move : (H1 H2).
 move => [rwme] _.
-rewrite rwme //.
-  qed.
-
-  local lemma G6_G7_indistinguishable_uptoresbad
-    (D <: SSEDistROM{G6,G7,OracleCallsCounter}) &m:
-    (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-      Pr[SSEExpROM(G6, G7, OracleCallsCounter(D)).game(true) @ &m : res]
-    <= Pr[SSEExpROM(G6, G7, OracleCallsCounter(D)).game(false) @ &m : res]
-    + Pr[SSEExpROM(G6, G7, OracleCallsCounter(D)).game(true) @ &m : res /\ G6_Client.bad_h1].
-  proof.
-    move => oracle.
-    rewrite RField.addrC Pr[mu_split (G6_Client.bad_h1)] ler_add2l.
-    apply (G6_G7_indistinguishable_resnotbad D &m oracle).
-  qed.
-
-  lemma G6_G7_indistinguishable_uptobad
-    (D <: SSEDistROM{G6,G7,OracleCallsCounter}) &m:
-    (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-      Pr[SSEExpROM(G6, G7, OracleCallsCounter(D)).game(true) @ &m : res]
-    <= Pr[SSEExpROM(G6, G7, OracleCallsCounter(D)).game(false) @ &m : res]
-    + Pr[SSEExpROM(G6, G7, OracleCallsCounter(D)).game(true) @ &m : G6_Client.bad_h1].
-  proof.
-    move => oracle.
-    pose p5 := Pr[SSEExpROM(G6, G7, OracleCallsCounter(D)).game(true) @ &m : res].
-    pose p6 := Pr[SSEExpROM(G6, G7, OracleCallsCounter(D)).game(false) @ &m : res].
-    rewrite RField.addrC RField.addrC Pr[mu_split res] andbC.
-    pose prb := Pr[SSEExpROM(G6, G7, OracleCallsCounter(D)).game(true) @ &m : res /\ G6_Client.bad_h1].
-    rewrite andbC RField.addrA.
-    pose prCb := Pr[SSEExpROM(G6, G7, OracleCallsCounter(D)).game(true) @ &m : !res /\ G6_Client.bad_h1].
-    rewrite (ler_trans (p6 + prb)).
-    rewrite /p5 /p6 /prb.
-    apply (G6_G7_indistinguishable_uptoresbad D &m oracle).
-    rewrite -RField.addrA ler_add2l -RField.addr0 ler_add2l.
-    smt.
+rewrite -rwme //.
   qed.
 
   (*
@@ -5820,15 +5705,14 @@ rewrite rwme //.
         + wp; skip; progress.
   qed.
 
-  local lemma G7_G8_indistinguishable_resnotbad
+  lemma G7_G8_indistinguishable_uptobad
     (D <: SSEDistROM{G7,G8,OracleCallsCounter}) &m:
     (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-    Pr[SSEExpROM(G7, G8, OracleCallsCounter(D)).game(true) @ &m : res /\ !G7_Client.bad_update_bt] <= Pr[SSEExpROM(G7, G8, OracleCallsCounter(D)).game(false) @ &m : res].
+    Pr[SSEExpROM(G7, G8, OracleCallsCounter(D)).game(false) @ &m : res] <= Pr[SSEExpROM(G7, G8, OracleCallsCounter(D)).game(true) @ &m : res] + Pr[SSEExpROM(G7, G8, OracleCallsCounter(D)).game(true) @ &m : G7_Client.bad_update_bt].
 proof.
 move : dut_ll di_ll dmapquery_ll dstoken_ll dkey_ll; rewrite /is_lossless => _ _ _ _ _.
 move => oracle.
 byequiv => //.
-symmetry.
 proc*.
 inline SSEExpROM(G7, G8, OracleCallsCounter(D)).game.
 rcondf{1} 2; first by progress; first by wp; skip; progress.
@@ -6019,43 +5903,10 @@ skip; progress.
  * No further procedures are left. Lastly, we need to prove that, in the meanwhile that the distinguisher does whatever she wants, the consistency, hence the indistinguishability, is kept in the case no bad events occur.
  *)
 wp; rnd; wp; skip; progress.
-move : (H1 H3).
+move : (H1 H2).
 move => [rwme] _.
-rewrite rwme //.
+rewrite -rwme //.
 qed.
-
-  local lemma G7_G8_indistinguishable_uptoresbad
-    (D <: SSEDistROM{G7,G8,OracleCallsCounter}) &m:
-    (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-      Pr[SSEExpROM(G7, G8, OracleCallsCounter(D)).game(true) @ &m : res]
-    <= Pr[SSEExpROM(G7, G8, OracleCallsCounter(D)).game(false) @ &m : res]
-    + Pr[SSEExpROM(G7, G8, OracleCallsCounter(D)).game(true) @ &m : res /\ G7_Client.bad_update_bt].
-  proof.
-    move => oracle.
-    rewrite RField.addrC Pr[mu_split (G7_Client.bad_update_bt)] ler_add2l.
-    apply (G7_G8_indistinguishable_resnotbad D &m oracle).
-  qed.
-
-  lemma G7_G8_indistinguishable_uptobad
-    (D <: SSEDistROM{G7,G8,OracleCallsCounter}) &m:
-    (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-      Pr[SSEExpROM(G7, G8, OracleCallsCounter(D)).game(true) @ &m : res]
-    <= Pr[SSEExpROM(G7, G8, OracleCallsCounter(D)).game(false) @ &m : res]
-    + Pr[SSEExpROM(G7, G8, OracleCallsCounter(D)).game(true) @ &m : G7_Client.bad_update_bt].
-  proof.
-    move => oracle.
-    pose p5 := Pr[SSEExpROM(G7, G8, OracleCallsCounter(D)).game(true) @ &m : res].
-    pose p6 := Pr[SSEExpROM(G7, G8, OracleCallsCounter(D)).game(false) @ &m : res].
-    rewrite RField.addrC RField.addrC Pr[mu_split res] andbC.
-    pose prb := Pr[SSEExpROM(G7, G8, OracleCallsCounter(D)).game(true) @ &m : res /\ G7_Client.bad_update_bt].
-    rewrite andbC RField.addrA.
-    pose prCb := Pr[SSEExpROM(G7, G8, OracleCallsCounter(D)).game(true) @ &m : !res /\ G7_Client.bad_update_bt].
-    rewrite (ler_trans (p6 + prb)).
-    rewrite /p5 /p6 /prb.
-    apply (G7_G8_indistinguishable_uptoresbad D &m oracle).
-    rewrite -RField.addrA ler_add2l -RField.addr0 ler_add2l.
-    smt.
-  qed.
 
   (*
    * === Part9 ===
@@ -6308,24 +6159,23 @@ qed.
         + wp; skip; progress.
   qed.
 
-  local lemma G8_G9_indistinguishable_resnotbad
+  lemma G8_G9_indistinguishable_uptobad
     (D <: SSEDistROM{G8,G9,OracleCallsCounter}) &m:
     (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-    Pr[SSEExpROM(G8, G9, OracleCallsCounter(D)).game(true) @ &m : res /\ !G8_Client.bad_update_h2t] <= Pr[SSEExpROM(G8, G9, OracleCallsCounter(D)).game(false) @ &m : res].
-  proof.
-    move : dut_ll di_ll dmapquery_ll dstoken_ll dkey_ll; rewrite /is_lossless => _ _ _ _ _.
-    move => oracle.
-    byequiv => //.
-    symmetry.
-    proc*.
-    inline SSEExpROM(G8, G9, OracleCallsCounter(D)).game.
-    rcondf{1} 2; first by progress; first by wp; skip; progress.
-    rcondt{2} 2; first by progress; first by wp; skip; progress.
-    inline*; wp.
-    call (_: G8_Client.bad_update_h2t, ={glob OracleCallsCounter, glob RF, glob G4_Server}
+    Pr[SSEExpROM(G8, G9, OracleCallsCounter(D)).game(false) @ &m : res] <= Pr[SSEExpROM(G8, G9, OracleCallsCounter(D)).game(true) @ &m : res] + Pr[SSEExpROM(G8, G9, OracleCallsCounter(D)).game(true) @ &m : G8_Client.bad_update_h2t].
+proof.
+  move : dut_ll di_ll dmapquery_ll dstoken_ll dkey_ll; rewrite /is_lossless => _ _ _ _ _.
+  move => oracle.
+  byequiv => //.
+  proc*.
+  inline SSEExpROM(G8, G9, OracleCallsCounter(D)).game.
+  rcondf{1} 2; first by progress; first by wp; skip; progress.
+  rcondt{2} 2; first by progress; first by wp; skip; progress.
+  inline*; wp.
+  call (_: G8_Client.bad_update_h2t, ={glob OracleCallsCounter, glob RF, glob G4_Server}
          /\   (G8_Client.et, G8_Client.utt, G8_Client.ws, G8_Client.h1t, G8_Client.h2t, G8_Client.sk, G8_Client.bad_rf_coll, G8_Client.bad_h1, G8_Client.bad_h2){2}
             = (G9_Client.et, G9_Client.utt, G9_Client.ws, G9_Client.h1t, G9_Client.h2t, G9_Client.sk, G9_Client.bad_rf_coll, G9_Client.bad_h1, G9_Client.bad_h2){1}
-    ) => //.
+  ) => //.
 (*
  * Indistinguishability of output and side effects (consistency)
  * Calling: update
@@ -6511,43 +6361,11 @@ skip; progress.
  * No further procedures are left. Lastly, we need to prove that, in the meanwhile that the distinguisher does whatever she wants, the consistency, hence the indistinguishability, is kept in the case no bad events occur.
  *)
 wp; rnd; wp; skip; progress.
-move : (H1 H3).
+move : (H1 H2).
 move => [rwme] _.
-rewrite rwme //.
+rewrite -rwme //.
   qed.
 
-  local lemma G8_G9_indistinguishable_uptoresbad
-    (D <: SSEDistROM{G8,G9,OracleCallsCounter}) &m:
-    (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-      Pr[SSEExpROM(G8, G9, OracleCallsCounter(D)).game(true) @ &m : res]
-    <= Pr[SSEExpROM(G8, G9, OracleCallsCounter(D)).game(false) @ &m : res]
-    + Pr[SSEExpROM(G8, G9, OracleCallsCounter(D)).game(true) @ &m : res /\ G8_Client.bad_update_h2t].
-  proof.
-    move => oracle.
-    rewrite RField.addrC Pr[mu_split (G8_Client.bad_update_h2t)] ler_add2l.
-    apply (G8_G9_indistinguishable_resnotbad D &m oracle).
-  qed.
-
-  lemma G8_G9_indistinguishable_uptobad
-    (D <: SSEDistROM{G8,G9,OracleCallsCounter}) &m:
-    (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-      Pr[SSEExpROM(G8, G9, OracleCallsCounter(D)).game(true) @ &m : res]
-    <= Pr[SSEExpROM(G8, G9, OracleCallsCounter(D)).game(false) @ &m : res]
-    + Pr[SSEExpROM(G8, G9, OracleCallsCounter(D)).game(true) @ &m : G8_Client.bad_update_h2t].
-  proof.
-    move => oracle.
-    pose p5 := Pr[SSEExpROM(G8, G9, OracleCallsCounter(D)).game(true) @ &m : res].
-    pose p6 := Pr[SSEExpROM(G8, G9, OracleCallsCounter(D)).game(false) @ &m : res].
-    rewrite RField.addrC RField.addrC Pr[mu_split res] andbC.
-    pose prb := Pr[SSEExpROM(G8, G9, OracleCallsCounter(D)).game(true) @ &m : res /\ G8_Client.bad_update_h2t].
-    rewrite andbC RField.addrA.
-    pose prCb := Pr[SSEExpROM(G8, G9, OracleCallsCounter(D)).game(true) @ &m : !res /\ G8_Client.bad_update_h2t].
-    rewrite (ler_trans (p6 + prb)).
-    rewrite /p5 /p6 /prb.
-    apply (G8_G9_indistinguishable_uptoresbad D &m oracle).
-    rewrite -RField.addrA ler_add2l -RField.addr0 ler_add2l.
-    smt.
-  qed.
 
   (*
    * === Part10 ===
@@ -6791,24 +6609,23 @@ rewrite rwme //.
         + wp; skip; progress.
   qed.
 
-  local lemma G9_G10_indistinguishable_resnotbad
+  lemma G9_G10_indistinguishable_uptobad
     (D <: SSEDistROM{G9,G10,OracleCallsCounter}) &m:
     (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-    Pr[SSEExpROM(G9, G10, OracleCallsCounter(D)).game(true) @ &m : res /\ !G9_Client.bad_update_h1t] <= Pr[SSEExpROM(G9, G10, OracleCallsCounter(D)).game(false) @ &m : res].
-  proof.
-    move : dut_ll di_ll dmapquery_ll dstoken_ll dkey_ll; rewrite /is_lossless => _ _ _ _ _.
-    move => oracle.
-    byequiv => //.
-    symmetry.
-    proc*.
-    inline SSEExpROM(G9, G10, OracleCallsCounter(D)).game.
-    rcondf{1} 2; first by progress; first by wp; skip; progress.
-    rcondt{2} 2; first by progress; first by wp; skip; progress.
-    inline*; wp.
-    call (_: G9_Client.bad_update_h1t, ={glob OracleCallsCounter, glob RF, glob G4_Server}
+    Pr[SSEExpROM(G9, G10, OracleCallsCounter(D)).game(false) @ &m : res] <= Pr[SSEExpROM(G9, G10, OracleCallsCounter(D)).game(true) @ &m : res] + Pr[SSEExpROM(G9, G10, OracleCallsCounter(D)).game(true) @ &m : G9_Client.bad_update_h1t].
+proof.
+  move : dut_ll di_ll dmapquery_ll dstoken_ll dkey_ll; rewrite /is_lossless => _ _ _ _ _.
+  move => oracle.
+  byequiv => //.
+  proc*.
+  inline SSEExpROM(G9, G10, OracleCallsCounter(D)).game.
+  rcondf{1} 2; first by progress; first by wp; skip; progress.
+  rcondt{2} 2; first by progress; first by wp; skip; progress.
+  inline*; wp.
+  call (_: G9_Client.bad_update_h1t, ={glob OracleCallsCounter, glob RF, glob G4_Server}
          /\   (G9_Client.et, G9_Client.utt, G9_Client.ws, G9_Client.h1t, G9_Client.h2t, G9_Client.sk, G9_Client.bad_rf_coll, G9_Client.bad_h1, G9_Client.bad_h2){2}
             = (G10_Client.et, G10_Client.utt, G10_Client.ws, G10_Client.h1t, G10_Client.h2t, G10_Client.sk, G10_Client.bad_rf_coll, G10_Client.bad_h1, G10_Client.bad_h2){1}
-    ) => //.
+  ) => //.
 (*
  * Indistinguishability of output and side effects (consistency)
  * Calling: update
@@ -6976,43 +6793,12 @@ skip; progress.
  * No further procedures are left. Lastly, we need to prove that, in the meanwhile that the distinguisher does whatever she wants, the consistency, hence the indistinguishability, is kept in the case no bad events occur.
  *)
 wp; rnd; wp; skip; progress.
-move : (H1 H3).
+move : (H1 H2).
 move => [rwme] _.
-rewrite rwme //.
+rewrite -rwme //.
   qed.
 
-  local lemma G9_G10_indistinguishable_uptoresbad
-    (D <: SSEDistROM{G9,G10,OracleCallsCounter}) &m:
-    (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-      Pr[SSEExpROM(G9, G10, OracleCallsCounter(D)).game(true) @ &m : res]
-    <= Pr[SSEExpROM(G9, G10, OracleCallsCounter(D)).game(false) @ &m : res]
-    + Pr[SSEExpROM(G9, G10, OracleCallsCounter(D)).game(true) @ &m : res /\ G9_Client.bad_update_h1t].
-  proof.
-    move => oracle.
-    rewrite RField.addrC Pr[mu_split (G9_Client.bad_update_h1t)] ler_add2l.
-    apply (G9_G10_indistinguishable_resnotbad D &m oracle).
-  qed.
 
-  lemma G9_G10_indistinguishable_uptobad
-    (D <: SSEDistROM{G9,G10,OracleCallsCounter}) &m:
-    (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-      Pr[SSEExpROM(G9, G10, OracleCallsCounter(D)).game(true) @ &m : res]
-    <= Pr[SSEExpROM(G9, G10, OracleCallsCounter(D)).game(false) @ &m : res]
-    + Pr[SSEExpROM(G9, G10, OracleCallsCounter(D)).game(true) @ &m : G9_Client.bad_update_h1t].
-  proof.
-    move => oracle.
-    pose p5 := Pr[SSEExpROM(G9, G10, OracleCallsCounter(D)).game(true) @ &m : res].
-    pose p6 := Pr[SSEExpROM(G9, G10, OracleCallsCounter(D)).game(false) @ &m : res].
-    rewrite RField.addrC RField.addrC Pr[mu_split res] andbC.
-    pose prb := Pr[SSEExpROM(G9, G10, OracleCallsCounter(D)).game(true) @ &m : res /\ G9_Client.bad_update_h1t].
-    rewrite andbC RField.addrA.
-    pose prCb := Pr[SSEExpROM(G9, G10, OracleCallsCounter(D)).game(true) @ &m : !res /\ G9_Client.bad_update_h1t].
-    rewrite (ler_trans (p6 + prb)).
-    rewrite /p5 /p6 /prb.
-    apply (G9_G10_indistinguishable_uptoresbad D &m oracle).
-    rewrite -RField.addrA ler_add2l -RField.addr0 ler_add2l.
-    smt.
-  qed.
 
   (*
    * === Part11 ===
@@ -7231,24 +7017,23 @@ rewrite rwme //.
         + wp; skip; progress.
   qed.
 
-  local lemma G10_G11_indistinguishable_resnotbad
+  lemma G10_G11_indistinguishable_uptobad
     (D <: SSEDistROM{G10,G11,OracleCallsCounter}) &m:
     (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-    Pr[SSEExpROM(G10, G11, OracleCallsCounter(D)).game(true) @ &m : res /\ !G10_Client.bad_rf_coll] <= Pr[SSEExpROM(G10, G11, OracleCallsCounter(D)).game(false) @ &m : res].
-  proof.
-    move : dut_ll di_ll dmapquery_ll dstoken_ll dkey_ll; rewrite /is_lossless => _ _ _ _ _.
-    move => oracle.
-    byequiv => //.
-    symmetry.
-    proc*.
-    inline SSEExpROM(G10, G11, OracleCallsCounter(D)).game.
-    rcondf{1} 2; first by progress; first by wp; skip; progress.
-    rcondt{2} 2; first by progress; first by wp; skip; progress.
-    inline*; wp.
-    call (_: G10_Client.bad_rf_coll, ={glob OracleCallsCounter, glob RF, glob G4_Server}
+    Pr[SSEExpROM(G10, G11, OracleCallsCounter(D)).game(false) @ &m : res] <= Pr[SSEExpROM(G10, G11, OracleCallsCounter(D)).game(true) @ &m : res] + Pr[SSEExpROM(G10, G11, OracleCallsCounter(D)).game(true) @ &m : G10_Client.bad_rf_coll].
+proof.
+  move : dut_ll di_ll dmapquery_ll dstoken_ll dkey_ll; rewrite /is_lossless => _ _ _ _ _.
+  move => oracle.
+  byequiv => //.
+  proc*.
+  inline SSEExpROM(G10, G11, OracleCallsCounter(D)).game.
+  rcondf{1} 2; first by progress; first by wp; skip; progress.
+  rcondt{2} 2; first by progress; first by wp; skip; progress.
+  inline*; wp.
+  call (_: G10_Client.bad_rf_coll, ={glob OracleCallsCounter, glob RF, glob G4_Server}
          /\   (G10_Client.et, G10_Client.utt, G10_Client.ws, G10_Client.h1t, G10_Client.h2t, G10_Client.sk, G10_Client.bad_rf_coll, G10_Client.bad_h1, G10_Client.bad_h2){2}
             = (G11_Client.et, G11_Client.utt, G11_Client.ws, G11_Client.h1t, G11_Client.h2t, G11_Client.sk, G11_Client.bad_rf_coll, G11_Client.bad_h1, G11_Client.bad_h2){1}
-    ) => //.
+  ) => //.
 (*
  * Indistinguishability of output and side effects (consistency)
  * Calling: update
@@ -7453,42 +7238,9 @@ skip; progress.
  * No further procedures are left. Lastly, we need to prove that, in the meanwhile that the distinguisher does whatever she wants, the consistency, hence the indistinguishability, is kept in the case no bad events occur.
  *)
 wp; rnd; wp; skip; progress.
-move : (H1 H3).
+move : (H1 H2).
 move => [rwme] _.
-rewrite rwme //.
-  qed.
-
-  local lemma G10_G11_indistinguishable_uptoresbad
-    (D <: SSEDistROM{G10,G11,OracleCallsCounter}) &m:
-    (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-      Pr[SSEExpROM(G10, G11, OracleCallsCounter(D)).game(true) @ &m : res]
-    <= Pr[SSEExpROM(G10, G11, OracleCallsCounter(D)).game(false) @ &m : res]
-    + Pr[SSEExpROM(G10, G11, OracleCallsCounter(D)).game(true) @ &m : res /\ G10_Client.bad_rf_coll].
-  proof.
-    move => oracle.
-    rewrite RField.addrC Pr[mu_split (G10_Client.bad_rf_coll)] ler_add2l.
-    apply (G10_G11_indistinguishable_resnotbad D &m oracle).
-  qed.
-
-  lemma G10_G11_indistinguishable_uptobad
-    (D <: SSEDistROM{G10,G11,OracleCallsCounter}) &m:
-    (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-      Pr[SSEExpROM(G10, G11, OracleCallsCounter(D)).game(true) @ &m : res]
-    <= Pr[SSEExpROM(G10, G11, OracleCallsCounter(D)).game(false) @ &m : res]
-    + Pr[SSEExpROM(G10, G11, OracleCallsCounter(D)).game(true) @ &m : G10_Client.bad_rf_coll].
-  proof.
-    move => oracle.
-    pose p5 := Pr[SSEExpROM(G10, G11, OracleCallsCounter(D)).game(true) @ &m : res].
-    pose p6 := Pr[SSEExpROM(G10, G11, OracleCallsCounter(D)).game(false) @ &m : res].
-    rewrite RField.addrC RField.addrC Pr[mu_split res] andbC.
-    pose prb := Pr[SSEExpROM(G10, G11, OracleCallsCounter(D)).game(true) @ &m : res /\ G10_Client.bad_rf_coll].
-    rewrite andbC RField.addrA.
-    pose prCb := Pr[SSEExpROM(G10, G11, OracleCallsCounter(D)).game(true) @ &m : !res /\ G10_Client.bad_rf_coll].
-    rewrite (ler_trans (p6 + prb)).
-    rewrite /p5 /p6 /prb.
-    apply (G10_G11_indistinguishable_uptoresbad D &m oracle).
-    rewrite -RField.addrA ler_add2l -RField.addr0 ler_add2l.
-    smt.
+rewrite -rwme //.
   qed.
 
   (*
@@ -7698,9 +7450,9 @@ rewrite rwme //.
   lemma G11_G12_indistinguishable
     (D <: SSEDistROM{G11,G12,OracleCallsCounter}) &m:
     Pr[SSEExpROM(G11, G12, OracleCallsCounter(D)).game(true) @ &m : res] = Pr[SSEExpROM(G11, G12, OracleCallsCounter(D)).game(false) @ &m : res].
-  proof.
-    byequiv => //.
-    proc*.
+proof.
+  byequiv => //.
+  proc*.
     inline SSEExpROM(G11, G12, OracleCallsCounter(D)).game.
     rcondt{1} 2; first by progress; first by wp; skip; progress.
     rcondf{2} 2; first by progress; first by wp; skip; progress.
@@ -10834,7 +10586,7 @@ wp; skip; move => &1 &2 [[[_ _] [[_] [_] [_ [_] [_] [_] [_] _]]]] [_] [[_] [_] [
 + smt.
 + smt.
 + smt.
-+ rewrite IntID.opprD addzA /= fcompE.
++ rewrite opprD addzA /= fcompE.
   move : t_def.
   pose addpat := filter (fun (x: int * operation * index) => x.`2 = ADD) (ahpU SophosLeakage.h{1} q{2}).
   have ->/=: 0 <= i0{2} < size addpat by smt.
@@ -11070,40 +10822,30 @@ case (sw = 0) => //= sw0.
 qed.
 
   (* LAdaptive Forward Secrecy *)
-  lemma sseladaptive_security_sophos_advantage (F<: PRF{Sophos,OracleCallsCounter}) (H1<: HashFunction1{OracleCallsCounter}) (H2<: HashFunction2{OracleCallsCounter})
+  lemma sseladaptive_security_sophos_advantage (F<: PRF) (H1<: HashFunction1) (H2<: HashFunction2)
     (D<: SSEDistROM{Sophos,SSIM,SophosLeakage,F,H1,H2})
   &m:
     is_lossless dcoins =>
     islossless F.keygen =>
-    islossless F.f =>
-    islossless H1.hash =>
-    islossless H2.hash =>
-    (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(OracleCallsCounter(D, SA).SSEAccessBounder).distinguish) =>
+    islossless D(Sophos(F, H1, H2)).distinguish =>
+    islossless D(SSESimulatorWrapper(SSIM, SophosLeakage)).distinguish =>
     ct TP.index sample forward backward => (* collection of trapdoor permutation *)
-    2%r * Pr[SSELAdaptiveSecurityROM(Sophos(F, H1, H2), SSIM, SophosLeakage, OracleCallsCounter(D)).main() @ &m : res] - 1%r =
-    Pr[Dsse(OracleCallsCounter(D), Sophos(F, H1, H2)).distinguish() @ &m : res] - Pr[Dsim(OracleCallsCounter(D), SSIM, SophosLeakage).distinguish() @ &m : res].
+    2%r * Pr[SSELAdaptiveSecurityROM(Sophos(F, H1, H2), SSIM, SophosLeakage, D).main() @ &m : res] - 1%r =
+    Pr[Dsse(D, Sophos(F, H1, H2)).distinguish() @ &m : res] - Pr[Dsim(D, SSIM, SophosLeakage).distinguish() @ &m : res].
   proof.
-    move => dcoins_ll keygen_ll f_ll h1_ll h2_ll PPTA_DBound ct_pre; move : (ct_pre).
+    move => dcoins_ll keygen_ll dist_ll distsim_ll ct_pre; move : (ct_pre).
     rewrite /ct /validkeypair /(-<) /cancel forall_and /=.
     move => [_ valk_can_fb].
-    rewrite (sseladaptiveexprom_advantage (Sophos(F, H1, H2)) SophosLeakage SSIM (OracleCallsCounter(D)) &m) //.
+    rewrite (sseladaptiveexprom_advantage (Sophos(F, H1, H2)) SophosLeakage SSIM D &m) //.
     + rewrite (sophos_setup_ll F H1 H2) //.
     + rewrite leaksetup_ll //.
     + rewrite (sim_setup_ll CTP) //.
     + rewrite ctp_index_ll //.
-    + rewrite (occ_distinguish_ll D (Sophos(F, H1, H2))) (PPTA_DBound (Sophos(F, H1, H2))) //.
-      rewrite (sophos_update_ll F H1 H2 f_ll h1_ll h2_ll).
-      rewrite (sophos_query_ll F H1 H2 f_ll h1_ll h2_ll).
-      rewrite (sophos_o_ll F H1 H2 h1_ll h2_ll).
-    + rewrite (occ_distinguish_ll D (SSESimulatorWrapper(SSIM, SophosLeakage))) (PPTA_DBound (SSESimulatorWrapper(SSIM, SophosLeakage))) //.
-      - proc; call (sim_update_ll CTP); call (leakupdate_ll) => //.
-      - proc; call (sim_query_ll CTP ctp_forward_ll ctp_backward_ll); call (leakquery_ll) => //.
-      - proc*; call (sim_o_ll CTP) => //.
-    rewrite (sseladaptiveexprom_dsse (Sophos(F, H1, H2)) SophosLeakage SSIM (OracleCallsCounter(D)) &m).
-    rewrite (sseladaptiveexprom_dsim (Sophos(F, H1, H2)) SophosLeakage SSIM (OracleCallsCounter(D)) &m) //.
+    rewrite (sseladaptiveexprom_dsse (Sophos(F, H1, H2)) SophosLeakage SSIM D &m).
+    rewrite (sseladaptiveexprom_dsim (Sophos(F, H1, H2)) SophosLeakage SSIM D &m) //.
   qed.
 
-  lemma sseladaptive_security_sophos
+  lemma sseladaptive_security_sophos_advantage
     (F <: PRF{RKF,OracleCallsCounter,RO1,Sophos,G1,SH1_Red,PRFO1.PRFO1,PRFO2.PRFO2,SP_Red})
     (H1<: HashFunction1{RKF,OracleCallsCounter,RO1,Sophos,G1,G2,SH1_Red,PRFO1.PRFO1,PRFO2.PRFO2,SP_Red,F})
     (H2<: HashFunction2{RKF,OracleCallsCounter,RO1,RO2,Sophos,G1,G2,G3,SH1_Red,PRFO1.PRFO1,PRFO2.PRFO2,SP_Red,F,H1,SH2_Red})
@@ -11111,218 +10853,86 @@ qed.
   &m:
     is_lossless dcoins =>
     islossless F.keygen =>
-    islossless F.f =>
-    islossless H1.hash =>
-    islossless H2.hash =>
     RKF.m{m} = empty =>
-    (RO1.m, RO2.m){m} = (empty, empty) =>
-    (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(SA).distinguish) =>
-    (forall (SA <: SSEAccess{D}), islossless SA.update => islossless SA.query => islossless SA.o => islossless D(OracleCallsCounter(D, SA).SSEAccessBounder).distinguish) =>
+    (forall (SA<: SSEAccess), islossless D(SA).distinguish) =>
+    (forall (SA<: SSEAccess), islossless D(OracleCallsCounter(D, SA).SSEAccessBounder).distinguish) =>
     ct TP.index sample forward backward => (* collection of trapdoor permutation *)
-       2%r * Pr[SSELAdaptiveSecurityROM(Sophos(F, H1, H2), SSIM, SophosLeakage, OracleCallsCounter(D)).main() @ &m : res] - 1%r
-    <= (2%r * Pr[PRFExp(F, RKF, SP_Red(H1, H2, OracleCallsCounter(D))).main() @ &m : res] - 1%r)
-    +  (2%r * Pr[HashExp1(H1, HashRO1, SH1_Red(H2, OracleCallsCounter(D))).main() @ &m : res] - 1%r)
-    +  (2%r * Pr[HashExp2(H2, HashRO2, SH2_Red(OracleCallsCounter(D))).main() @ &m : res] - 1%r)
-    +  Pr[Dsse(OracleCallsCounter(D),  G5).distinguish() @ &m : G5_Client.bad_rf_coll]
-    +  Pr[Dsse(OracleCallsCounter(D),  G5).distinguish() @ &m : G5_Client.bad_update_h1t]
-    +  Pr[Dsse(OracleCallsCounter(D),  G5).distinguish() @ &m : G5_Client.bad_update_h2t]
-    +  Pr[Dsse(OracleCallsCounter(D),  G5).distinguish() @ &m : G5_Client.bad_update_bt]
-    +  Pr[Dsse(OracleCallsCounter(D),  G5).distinguish() @ &m : G5_Client.bad_h1]
-    +  Pr[Dsse(OracleCallsCounter(D),  G5).distinguish() @ &m : G5_Client.bad_h2]
-    +  Pr[Dsse(OracleCallsCounter(D), G10).distinguish() @ &m : G10_Client.bad_rf_coll]
-    +  Pr[Dsse(OracleCallsCounter(D),  G9).distinguish() @ &m : G9_Client.bad_update_h1t]
-    +  Pr[Dsse(OracleCallsCounter(D),  G8).distinguish() @ &m : G8_Client.bad_update_h2t]
-    +  Pr[Dsse(OracleCallsCounter(D),  G7).distinguish() @ &m : G7_Client.bad_update_bt]
-    +  Pr[Dsse(OracleCallsCounter(D),  G6).distinguish() @ &m : G6_Client.bad_h1]
-    +  Pr[Dsse(OracleCallsCounter(D),  G5).distinguish() @ &m : G5_Client.bad_h2]
-    .
+    2%r * Pr[SSELAdaptiveSecurityROM(Sophos(F, H1, H2), SSIM, SophosLeakage, OracleCallsCounter(D)).main() @ &m : res] - 1%r <=
+    Pr[Dsse(OracleCallsCounter(D), Sophos(F, H1, H2)).distinguish() @ &m : res] - Pr[Dsim(OracleCallsCounter(D), SSIM, SophosLeakage).distinguish() @ &m : res].
   proof.
-    move => dcoins_ll keygen_ll f_ll h1_ll h2_ll rkf_0 ro12_0 PPTA_D PPTA_DBound ct_pre; move : (ct_pre).
+    move => dcoins_ll keygen_ll rkf_0 PPTA_D PPTA_DBound ct_pre; move : (ct_pre).
     rewrite /ct /validkeypair /(-<) /cancel forall_and /=.
     move => [_ valk_can_fb].
-    (* Rewrite games with D notation *)
-    have eq2adv: forall p q, p = q <=> 2%r*p - 1%r = 2%r*q - 1%r by smt.
-    have ltr_add2l: forall (n p q: real), n + p <= n + q <=> p <= q by smt.
-    have ler_subl: forall (p q n: real), p - q <= n <=> p <= q + n by smt.
-    have eqr_subl: forall (p q n: real), p - q = n <=> p = q + n by smt.
-    have compose: forall (a b p q: real), a <= b => p <= q => a + p <= b + q by smt.
-    pose DS := Pr[Dsim(OracleCallsCounter(D), SSIM, SophosLeakage).distinguish() @ &m : res];
-      pose D16 := Pr[Dsse(OracleCallsCounter(D), G16).distinguish() @ &m : res];
-      pose D15 := Pr[Dsse(OracleCallsCounter(D), G15).distinguish() @ &m : res];
-      pose D14 := Pr[Dsse(OracleCallsCounter(D), G14).distinguish() @ &m : res];
-      pose D13 := Pr[Dsse(OracleCallsCounter(D), G13).distinguish() @ &m : res];
-      pose D12 := Pr[Dsse(OracleCallsCounter(D), G12).distinguish() @ &m : res];
-      pose D11 := Pr[Dsse(OracleCallsCounter(D), G11).distinguish() @ &m : res];
-      pose D10 := Pr[Dsse(OracleCallsCounter(D), G10).distinguish() @ &m : res];
-      pose D10_bad_rf_coll := Pr[Dsse(OracleCallsCounter(D), G10).distinguish() @ &m : G10_Client.bad_rf_coll];
-      pose D9 := Pr[Dsse(OracleCallsCounter(D), G9).distinguish() @ &m : res];
-      pose D9_bad_update_h1t := Pr[Dsse(OracleCallsCounter(D), G9).distinguish() @ &m : G9_Client.bad_update_h1t];
-      pose D8 := Pr[Dsse(OracleCallsCounter(D), G8).distinguish() @ &m : res];
-      pose D8_bad_update_h2t := Pr[Dsse(OracleCallsCounter(D), G8).distinguish() @ &m : G8_Client.bad_update_h2t];
-      pose D7 := Pr[Dsse(OracleCallsCounter(D), G7).distinguish() @ &m : res];
-      pose D7_bad_update_bt := Pr[Dsse(OracleCallsCounter(D), G7).distinguish() @ &m : G7_Client.bad_update_bt];
-      pose D6 := Pr[Dsse(OracleCallsCounter(D), G6).distinguish() @ &m : res];
-      pose D6_bad_h1 := Pr[Dsse(OracleCallsCounter(D), G6).distinguish() @ &m : G6_Client.bad_h1];
-      pose D5 := Pr[Dsse(OracleCallsCounter(D), G5).distinguish() @ &m : res];
-      pose D5_bad_h2 := Pr[Dsse(OracleCallsCounter(D), G5).distinguish() @ &m : G5_Client.bad_h2];
-      pose D5_bad_h1 := Pr[Dsse(OracleCallsCounter(D), G5).distinguish() @ &m : G5_Client.bad_h1];
-      pose D5_bad_update_bt := Pr[Dsse(OracleCallsCounter(D), G5).distinguish() @ &m : G5_Client.bad_update_bt];
-      pose D5_bad_update_h2t := Pr[Dsse(OracleCallsCounter(D), G5).distinguish() @ &m : G5_Client.bad_update_h2t];
-      pose D5_bad_update_h1t := Pr[Dsse(OracleCallsCounter(D), G5).distinguish() @ &m : G5_Client.bad_update_h1t];
-      pose D5_bad_rf_coll := Pr[Dsse(OracleCallsCounter(D), G5).distinguish() @ &m : G5_Client.bad_rf_coll];
-      pose D5_bad := D5_bad_rf_coll + D5_bad_update_h1t + D5_bad_update_h2t + D5_bad_update_bt + D5_bad_h1 + D5_bad_h2;
-      pose D4 := Pr[Dsse(OracleCallsCounter(D), G4).distinguish() @ &m : res];
-      pose D3 := Pr[Dsse(OracleCallsCounter(D), G3).distinguish() @ &m : res];
-      pose D2 := Pr[Dsse(OracleCallsCounter(D), G2(H2)).distinguish() @ &m : res];
-      pose D1 := Pr[Dsse(OracleCallsCounter(D), G1(H1, H2)).distinguish() @ &m : res];
-      pose DSophos := Pr[Dsse(OracleCallsCounter(D), Sophos(F, H1, H2)).distinguish() @ &m : res];
-      pose Adv_h1 := 2%r*Pr[HashExp1(H1, HashRO1, SH1_Red(H2, OracleCallsCounter(D))).main() @ &m : res] - 1%r;
-      pose Adv_h2 := 2%r*Pr[HashExp2(H2, HashRO2, SH2_Red(OracleCallsCounter(D))).main() @ &m : res] - 1%r;
-      pose Adv_f := 2%r*Pr[PRFExp(F, RKF, SP_Red(H1, H2, OracleCallsCounter(D))).main() @ &m : res] - 1%r.
-    move : (G16_Sim_indistinguishable D &m ct_pre);
-      rewrite (sseladaptiveexprom_dsim G16 SophosLeakage SSIM (OracleCallsCounter(D)) &m);
-      rewrite (sseladaptiveexprom_dsse G16 SophosLeakage SSIM (OracleCallsCounter(D)) &m);
-      rewrite -/DS -/D16 => D16_DS.
-    move : (G15_G16_indistinguishable D &m);
-      rewrite (sseexprom_dsse_left  G15 G16 (OracleCallsCounter(D)) &m);
-      rewrite (sseexprom_dsse_right G15 G16 (OracleCallsCounter(D)) &m);
-      rewrite -/D16 -/D15 => D15_D16.
-    move : (G14_G15_indistinguishable D &m ct_pre);
-      rewrite (sseexprom_dsse_left  G14 G15 (OracleCallsCounter(D)) &m);
-      rewrite (sseexprom_dsse_right G14 G15 (OracleCallsCounter(D)) &m);
-      rewrite -/D15 -/D14 => D14_D15.
-    move : (G13_G14_indistinguishable D &m);
-      rewrite (sseexprom_dsse_left  G13 G14 (OracleCallsCounter(D)) &m);
-      rewrite (sseexprom_dsse_right G13 G14 (OracleCallsCounter(D)) &m);
-      rewrite -/D14 -/D13 => D13_D14.
-    move : (G12_G13_indistinguishable D &m);
-      rewrite (sseexprom_dsse_left  G12 G13 (OracleCallsCounter(D)) &m);
-      rewrite (sseexprom_dsse_right G12 G13 (OracleCallsCounter(D)) &m);
-      rewrite -/D13 -/D12 => D12_D13.
-    move : (G11_G12_indistinguishable D &m);
-      rewrite (sseexprom_dsse_left  G11 G12 (OracleCallsCounter(D)) &m);
-      rewrite (sseexprom_dsse_right G11 G12 (OracleCallsCounter(D)) &m);
-      rewrite -/D12 -/D11 => D11_D12.
-    move : (G10_G11_indistinguishable_uptobad D &m PPTA_D);
-      rewrite (sseexprom_dsse_left  G10 G11 (OracleCallsCounter(D)) &m);
-      rewrite (sseexprom_dsse_right G10 G11 (OracleCallsCounter(D)) &m);
-      have ->: Pr[SSEExpROM(G10, G11, OracleCallsCounter(D)).game (true) @ &m : G10_Client.bad_rf_coll] = Pr[Dsse(OracleCallsCounter(D), G10).distinguish() @ &m : G10_Client.bad_rf_coll] by byequiv => //; proc; rcondt{1} 1; progress; seq 2 2: (={G10_Client.bad_rf_coll}) => //; sim.
-      rewrite -ler_subl -/D11 -/D10 -/D10_bad_rf_coll => D10_D11.
-    move : (G9_G10_indistinguishable_uptobad D &m PPTA_D);
-      rewrite (sseexprom_dsse_left  G9 G10 (OracleCallsCounter(D)) &m);
-      rewrite (sseexprom_dsse_right G9 G10 (OracleCallsCounter(D)) &m);
-      have ->: Pr[SSEExpROM(G9, G10, OracleCallsCounter(D)).game (true) @ &m : G9_Client.bad_update_h1t] = Pr[Dsse(OracleCallsCounter(D), G9).distinguish() @ &m : G9_Client.bad_update_h1t] by byequiv => //; proc; rcondt{1} 1; progress; seq 2 2: (={G9_Client.bad_update_h1t}) => //; sim.
-      rewrite -ler_subl -/D10 -/D9 -/D9_bad_update_h1t => D9_D10.
-    move : (G8_G9_indistinguishable_uptobad D &m PPTA_D);
-      rewrite (sseexprom_dsse_left  G8 G9 (OracleCallsCounter(D)) &m);
-      rewrite (sseexprom_dsse_right G8 G9 (OracleCallsCounter(D)) &m);
-      have ->: Pr[SSEExpROM(G8, G9, OracleCallsCounter(D)).game (true) @ &m : G8_Client.bad_update_h2t] = Pr[Dsse(OracleCallsCounter(D), G8).distinguish() @ &m : G8_Client.bad_update_h2t] by byequiv => //; proc; rcondt{1} 1; progress; seq 2 2: (={G8_Client.bad_update_h2t}) => //; sim.
-      rewrite -ler_subl -/D9 -/D8 -/D8_bad_update_h2t => D8_D9.
-    move : (G7_G8_indistinguishable_uptobad D &m PPTA_D);
-      rewrite (sseexprom_dsse_left  G7 G8 (OracleCallsCounter(D)) &m);
-      rewrite (sseexprom_dsse_right G7 G8 (OracleCallsCounter(D)) &m);
-      have ->: Pr[SSEExpROM(G7, G8, OracleCallsCounter(D)).game (true) @ &m : G7_Client.bad_update_bt] = Pr[Dsse(OracleCallsCounter(D), G7).distinguish() @ &m : G7_Client.bad_update_bt] by byequiv => //; proc; rcondt{1} 1; progress; seq 2 2: (={G7_Client.bad_update_bt}) => //; sim.
-      rewrite -ler_subl -/D8 -/D7 -/D7_bad_update_bt => D7_D8.
-    move : (G6_G7_indistinguishable_uptobad D &m PPTA_D);
-      rewrite (sseexprom_dsse_left  G6 G7 (OracleCallsCounter(D)) &m);
-      rewrite (sseexprom_dsse_right G6 G7 (OracleCallsCounter(D)) &m);
-      have ->: Pr[SSEExpROM(G6, G7, OracleCallsCounter(D)).game (true) @ &m : G6_Client.bad_h1] = Pr[Dsse(OracleCallsCounter(D), G6).distinguish() @ &m : G6_Client.bad_h1] by byequiv => //; proc; rcondt{1} 1; progress; seq 2 2: (={G6_Client.bad_h1}) => //; sim.
-      rewrite -ler_subl -/D7 -/D6 -/D6_bad_h1 => D6_D7.
-    move : (G5_G6_indistinguishable_uptobad D &m PPTA_D);
-      rewrite (sseexprom_dsse_left  G5 G6 (OracleCallsCounter(D)) &m);
-      rewrite (sseexprom_dsse_right G5 G6 (OracleCallsCounter(D)) &m);
-      have ->: Pr[SSEExpROM(G5, G6, OracleCallsCounter(D)).game (true) @ &m : G5_Client.bad_h2] = Pr[Dsse(OracleCallsCounter(D), G5).distinguish() @ &m : G5_Client.bad_h2] by byequiv => //; proc; rcondt{1} 1; progress; seq 2 2: (={G5_Client.bad_h2}) => //; sim.
-      rewrite -ler_subl -/D6 -/D5 -/D5_bad_h2 => D5_D6.
-    move : (G4_G5_indistinguishable_uptobad_disjoint D &m PPTA_D ro12_0);
-      rewrite (sseexprom_dsse_left  G4 G5 (OracleCallsCounter(D)) &m);
-      rewrite (sseexprom_dsse_right G4 G5 (OracleCallsCounter(D)) &m).
-      have ->: Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_h2] = Pr[Dsse(OracleCallsCounter(D), G5).distinguish() @ &m : G5_Client.bad_h2] by byequiv => //; proc; rcondf{1} 1; progress; seq 2 2: (={G5_Client.bad_h2}) => //; sim.
-      have ->: Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_h1] = Pr[Dsse(OracleCallsCounter(D), G5).distinguish() @ &m : G5_Client.bad_h1] by byequiv => //; proc; rcondf{1} 1; progress; seq 2 2: (={G5_Client.bad_h1}) => //; sim.
-      have ->: Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_update_h2t] = Pr[Dsse(OracleCallsCounter(D), G5).distinguish() @ &m : G5_Client.bad_update_h2t] by byequiv => //; proc; rcondf{1} 1; progress; seq 2 2: (={G5_Client.bad_update_h2t}) => //; sim.
-      have ->: Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_update_h1t] = Pr[Dsse(OracleCallsCounter(D), G5).distinguish() @ &m : G5_Client.bad_update_h1t] by byequiv => //; proc; rcondf{1} 1; progress; seq 2 2: (={G5_Client.bad_update_h1t}) => //; sim.
-      have ->: Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_update_bt] = Pr[Dsse(OracleCallsCounter(D), G5).distinguish() @ &m : G5_Client.bad_update_bt] by byequiv => //; proc; rcondf{1} 1; progress; seq 2 2: (={G5_Client.bad_update_bt}) => //; sim.
-      have ->: Pr[SSEExpROM(G4, G5, OracleCallsCounter(D)).game(false) @ &m : G5_Client.bad_rf_coll] = Pr[Dsse(OracleCallsCounter(D), G5).distinguish() @ &m : G5_Client.bad_rf_coll] by byequiv => //; proc; rcondf{1} 1; progress; seq 2 2: (={G5_Client.bad_rf_coll}) => //; sim.
-      rewrite -15!RField.addrA -ler_subl -/D5 -/D4 -/D5_bad_rf_coll -/D5_bad_update_h1t -/D5_bad_update_h2t -/D5_bad_update_bt -/D5_bad_h1 -/D5_bad_h2 14!RField.addrA => D4_D5.
-    move : (G3_G4_indistinguishable D &m rkf_0);
-      rewrite (sseexprom_dsse_left  G3 G4 (OracleCallsCounter(D)) &m);
-      rewrite (sseexprom_dsse_right G3 G4 (OracleCallsCounter(D)) &m);
-      rewrite -/D3 -/D4 => D3_D4.
+    have rwadv: forall (p q: real), p = q <=> 2%r * p - 1%r = 2%r * q - 1%r by smt.
+    have rwadv_move: forall (p q r: real), p - q = 2%r * r - 1%r <=> p = q + 2%r * r - 1%r by smt.
+    (* Reduction to PRF experiment *)
+    move : (sophos_G1_reduction_to_prfexp F H1 H2 D &m).
+    rewrite rwadv (sseexprom_advantage (Sophos(F, H1, H2)) (G1(H1, H2)) (OracleCallsCounter(D)) &m) //.
+    + rewrite (sophos_setup_ll F H1 H2) //.
+    + rewrite (G1_setup_ll H1 H2) //.
+    + rewrite (occ_distinguish_ll D (Sophos(F, H1, H2))) (PPTA_DBound (Sophos(F, H1, H2))) //.
+    + rewrite (occ_distinguish_ll D (G1(H1, H2))) (PPTA_DBound (G1(H1, H2))) //.
+    rewrite rwadv_move => rw_prf.
+    rewrite -(sseexprom_dsse_left (Sophos(F, H1, H2)) (G1(H1, H2)) (OracleCallsCounter(D)) &m) rw_prf.
+    (* Reduction to H1 experiment *)
+    move : (G1_G2_reduction_to_hashexp1 H1 H2 D &m).
+    rewrite rwadv (sseexprom_advantage (G1(H1, H2)) (G2(H2)) (OracleCallsCounter(D)) &m) //.
+    + rewrite (G1_setup_ll H1 H2) //.
+    + rewrite (G2_setup_ll H2) //.
+    + rewrite (occ_distinguish_ll D (G1(H1, H2))) (PPTA_DBound (G1(H1, H2))) //.
+    + rewrite (occ_distinguish_ll D (G2(H2))) (PPTA_DBound (G2(H2))) //.
+    rewrite rwadv_move => rw_h1.
+    rewrite (sseexprom_dsse_right (Sophos(F, H1, H2)) (G1(H1, H2)) (OracleCallsCounter(D)) &m) -(sseexprom_dsse_left (G1(H1, H2)) (G2(H2)) (OracleCallsCounter(D)) &m) rw_h1.
+    (* Reduction to H2 experiment *)
     move : (G2_G3_reduction_to_hashexp2 H2 D &m).
-      rewrite eq2adv (sseexprom_advantage (G2(H2)) G3 (OracleCallsCounter(D)) &m).
-      + apply (G2_setup_ll H2 dcoins_ll).
-      + apply (G3_setup_ll dcoins_ll).
-      + rewrite (occ_distinguish_ll D (G2(H2))) (PPTA_DBound (G2(H2))).
-        - apply (G2_update_ll H2 h2_ll).
-        - apply (G2_query_ll H2 h2_ll).
-        - apply (G2_o_ll H2 h2_ll).
-      + rewrite (occ_distinguish_ll D G3) (PPTA_DBound G3 G3_update_ll G3_query_ll G3_o_ll).
-      rewrite (sseexprom_dsse_left  (G2(H2)) G3 (OracleCallsCounter(D)) &m);
-      rewrite (sseexprom_dsse_right (G2(H2)) G3 (OracleCallsCounter(D)) &m);
-      rewrite eqr_subl -/D2 -/D3 -/Adv_h2 => D2_D3.
-    move : (G1_G2_reduction_to_hashexp1 H1 H2 D &m);
-      rewrite eq2adv (sseexprom_advantage (G1(H1, H2)) (G2(H2)) (OracleCallsCounter(D)) &m).
-      + apply (G1_setup_ll H1 H2 dcoins_ll).
-      + apply (G2_setup_ll H2 dcoins_ll).
-      + rewrite (occ_distinguish_ll D (G1(H1, H2))) (PPTA_DBound (G1(H1, H2))).
-        - apply (G1_update_ll H1 H2 h1_ll h2_ll).
-        - apply (G1_query_ll H1 H2 h1_ll h2_ll).
-        - apply (G1_o_ll H1 H2 h1_ll h2_ll).
-      + rewrite (occ_distinguish_ll D (G2(H2))) (PPTA_DBound (G2(H2))).
-        - apply (G2_update_ll H2 h2_ll).
-        - apply (G2_query_ll H2 h2_ll).
-        - apply (G2_o_ll H2 h2_ll).
-      rewrite (sseexprom_dsse_left  (G1(H1, H2)) (G2(H2)) (OracleCallsCounter(D)) &m);
-      rewrite (sseexprom_dsse_right (G1(H1, H2)) (G2(H2)) (OracleCallsCounter(D)) &m);
-      rewrite eqr_subl -/D1 -/D2 -/Adv_h1 => D1_D2.
-    move : (sophos_G1_reduction_to_prfexp F H1 H2 D &m);
-      rewrite eq2adv (sseexprom_advantage (Sophos(F, H1, H2)) (G1(H1, H2)) (OracleCallsCounter(D)) &m).
-      + apply (sophos_setup_ll F H1 H2 dcoins_ll keygen_ll).
-      + apply (G1_setup_ll H1 H2 dcoins_ll).
-      + rewrite (occ_distinguish_ll D (Sophos(F, H1, H2))) (PPTA_DBound (Sophos(F, H1, H2))).
-        - apply (sophos_update_ll F H1 H2 f_ll h1_ll h2_ll).
-        - apply (sophos_query_ll F H1 H2 f_ll h1_ll h2_ll).
-        - apply (sophos_o_ll F H1 H2 h1_ll h2_ll).
-      + rewrite (occ_distinguish_ll D (G1(H1, H2))) (PPTA_DBound (G1(H1, H2))).
-        - apply (G1_update_ll H1 H2 h1_ll h2_ll).
-        - apply (G1_query_ll H1 H2 h1_ll h2_ll).
-        - apply (G1_o_ll H1 H2 h1_ll h2_ll).
-      rewrite (sseexprom_dsse_left  (Sophos(F, H1, H2)) (G1(H1, H2)) (OracleCallsCounter(D)) &m);
-      rewrite (sseexprom_dsse_right (Sophos(F, H1, H2)) (G1(H1, H2)) (OracleCallsCounter(D)) &m);
-      rewrite eqr_subl -/DSophos -/D1 -/Adv_f => DSophos_D1.
-    (* Now we can start rewriting the advantage *)
-    rewrite (sseladaptiveexprom_advantage (Sophos(F, H1, H2)) SophosLeakage SSIM (OracleCallsCounter(D)) &m).
-      + apply (sophos_setup_ll F H1 H2 dcoins_ll keygen_ll).
-      + apply leaksetup_ll.
-      + apply (sim_setup_ll CTP (ctp_index_ll dcoins_ll)).
-      + rewrite (occ_distinguish_ll D (Sophos(F, H1, H2))) (PPTA_DBound (Sophos(F, H1, H2))).
-        - apply (sophos_update_ll F H1 H2 f_ll h1_ll h2_ll).
-        - apply (sophos_query_ll F H1 H2 f_ll h1_ll h2_ll).
-        - apply (sophos_o_ll F H1 H2 h1_ll h2_ll).
-      + rewrite (occ_distinguish_ll D (SSESimulatorWrapper(SSIM, SophosLeakage))) (PPTA_DBound (SSESimulatorWrapper(SSIM, SophosLeakage))).
-        - apply (simw_update_ll SSIM SophosLeakage leakupdate_ll (sim_update_ll CTP)).
-        - apply (simw_query_ll SSIM SophosLeakage leakquery_ll (sim_query_ll CTP ctp_forward_ll ctp_backward_ll)).
-        - apply (sim_o_ll CTP).
-    rewrite (sseladaptiveexprom_dsse (Sophos(F, H1, H2)) SophosLeakage SSIM (OracleCallsCounter(D)) &m).
-    rewrite (sseladaptiveexprom_dsim (Sophos(F, H1, H2)) SophosLeakage SSIM (OracleCallsCounter(D)) &m).
-    rewrite -/DSophos -/DS.
-    (* Composing games *)
-    rewrite -13!RField.addrA.
-    (* - Remove Adv_f *)
-    rewrite DSophos_D1 (RField.addrC D1) -1!RField.addrA ler_add2l.
-    (* - Remove Adv_h1 *)
-    rewrite D1_D2 (RField.addrC D2) -1!RField.addrA ler_add2l.
-    (* - Remove Adv_h2 *)
-    rewrite D2_D3 D3_D4 (RField.addrC D4) -1!RField.addrA ler_add2l.
-    (* - From the SIM side *)
-    rewrite ler_subl D16_DS -D15_D16 -D14_D15 -D13_D14 -D12_D13 -D11_D12 -ler_subl.
-    (* - Complete *)
-    move : (compose _ _ _ _   D6_D7  D5_D6); rewrite RField.addrC -RField.addrA (RField.addrA _  D6) /= =>  D5_D7.
-    move : (compose _ _ _ _   D7_D8  D5_D7); rewrite RField.addrC -RField.addrA (RField.addrA _  D7) /= =>  D5_D8.
-    move : (compose _ _ _ _   D8_D9  D5_D8); rewrite RField.addrC -RField.addrA (RField.addrA _  D8) /= =>  D5_D9.
-    move : (compose _ _ _ _  D9_D10  D5_D9); rewrite RField.addrC -RField.addrA (RField.addrA _  D9) /= => D5_D10.
-    move : (compose _ _ _ _ D10_D11 D5_D10); rewrite RField.addrC -RField.addrA (RField.addrA _ D10) /= => D5_D11.
-    move : (compose _ _ _ _  D5_D11  D4_D5); rewrite RField.addrC -RField.addrA (RField.addrA _  D5).
-    rewrite (RField.addrC _ D5_bad) -6!RField.addrA //.
+    rewrite rwadv (sseexprom_advantage (G2(H2)) G3 (OracleCallsCounter(D)) &m) //.
+    + rewrite (G2_setup_ll H2) //.
+    + rewrite (G3_setup_ll) //.
+    + rewrite (occ_distinguish_ll D (G2(H2))) (PPTA_DBound (G2(H2))) //.
+    + rewrite (occ_distinguish_ll D G3) (PPTA_DBound G3) //.
+    rewrite rwadv_move => rw_h2.
+    rewrite (sseexprom_dsse_right (G1(H1, H2)) (G2(H2)) (OracleCallsCounter(D)) &m) -(sseexprom_dsse_left (G2(H2)) G3 (OracleCallsCounter(D)) &m) rw_h2.
+    (* RKF equality *)
+    rewrite (sseexprom_dsse_right (G2(H2)) G3 (OracleCallsCounter(D)) &m). rewrite -(sseexprom_dsse_left G3 G4 (OracleCallsCounter(D)) &m).
+
+move : (G2_G3_reduction_to_hashexp2 H2 D &m).
+rewrite (sseexprom_total_probability (G2(H2)) G3 (OracleCallsCounter(D)) &m) rwadv => rw_g2.
+
+
+
+
+    rewrite -(sseexprom_dsse_left (Sophos(F, H1, H2)) (G1(H1, H2)) D &m).
+
+
+
+    rewrite -(sseladaptiveexprom_dsim (Sophos(F, H1, H2)) SophosLeakage SSIM D &m).
+
+  qed.
+
+
+
+  (* Tidying up the proofs *)
+  lemma exp_G16_Sim
+    (D <: SSEDistROM{G16,SSIM,OracleCallsCounter,SophosLeakage}) &m:
+    ct TP.index sample forward backward => (* collection of trapdoor permutation *)
+    Pr[SSELAdaptiveSecurityROM(G16, SSIM, SophosLeakage, OracleCallsCounter(D)).main() @ &m : res] = inv 2%r.
+  proof.
+    move => ct_pre; move : (ct_pre).
+    rewrite /ct /validkeypair /(-<) /cancel forall_and /=.
+    move => [_ valk_can_fb].
+    rewrite (sseladaptiveexprom_total_probability G16 SophosLeakage SSIM (OracleCallsCounter(D)) &m).
+    move : (G16_Sim_indistinguishable D &m ct_pre) => rwme. (* This is weird *)
+    rewrite -rwme /=.
+rewrite Pr[mu_not].
+have _: islossless G16.setup by admit.
+have _: islossless SophosLeakage.leakSetup by admit.
+have _: islossless SSIM.setup by admit.
+have _: islossless OracleCallsCounter(D, G16).distinguish by admit.
+have _: islossless OracleCallsCounter(D, SSESimulatorWrapper(SSIM, SophosLeakage)).distinguish by admit.
+have ->/=: Pr[SSELAdaptiveSecurityROM(G16, SSIM, SophosLeakage, OracleCallsCounter(D)).game(false) @ &m : true] = 1%r.
+byphoare => //.
+rewrite (sseladaptiveexprom_game_ll G16 SSIM SophosLeakage (OracleCallsCounter(D))) //.
+algebra => //.
   qed.
 
   end section SophosSecurity.
