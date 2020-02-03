@@ -334,7 +334,7 @@ proof.
         * rewrite mem_set x1x 2!get_set_sameE Core.oget_some //=.
         * rewrite get_set_neqE // get_set_neqE // mem_set x1x /= => pre_m.
           move : (mem_l_m _ pre_m) => //.
-      - move : H1 H2; rewrite 2!get_set_sameE Core.oget_some /= set_setE /= set_setE /=.
+      - move : H1; rewrite 2!get_set_sameE Core.oget_some /= set_setE /= set_setE /=.
         case (x1 = x{2}) => /= x1x.
         * rewrite mem_set x1x 2!get_set_sameE Core.oget_some //=.
         * rewrite get_set_neqE // get_set_neqE // mem_set x1x /= => pre_m.
