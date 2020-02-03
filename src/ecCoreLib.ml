@@ -58,15 +58,20 @@ module CI_Int = struct
   let p_Int = EcPath.pqname p_top i_Int
   let p_int = _Pervasive "int"
 
-  let _Int = fun x -> EcPath.pqname p_Int x
+  let i_IntDiv = "IntDiv"
+  let p_IntDiv = EcPath.pqname p_top i_IntDiv
 
-  let p_int_elim = _Int "intind"
-  let p_int_opp = _Int "[-]"
-  let p_int_add = _Int "+"
-  let p_int_mul = _Int "*"
-  let p_int_pow = _Int "^"
-  let p_int_le  = _Int "<="
-  let p_int_lt  = _Int "<"
+  let _Int    = fun x -> EcPath.pqname p_Int x
+  let _IntDiv = fun x -> EcPath.pqname p_IntDiv x
+
+  let p_int_elim  = _Int "intind"
+  let p_int_opp   = _Int "[-]"
+  let p_int_add   = _Int "+"
+  let p_int_mul   = _Int "*"
+  let p_int_pow   = _Int "^"
+  let p_int_le    = _Int "<="
+  let p_int_lt    = _Int "<"
+  let p_int_edivz = _IntDiv "edivz"
 end
 
 (* -------------------------------------------------------------------- *)
@@ -214,6 +219,7 @@ module CI_Logic = struct
   let p_eq_trans      = _Logic "eq_trans"
   let p_eq_iff        = _Logic "eq_iff"
   let p_fcongr        = _Logic "congr1"
+  let p_eq_ind        = _Logic "eq_ind"
   let p_eq_sym        = _Logic "eq_sym"
   let p_eq_sym_imp    = _Logic "eq_sym_imp"
   let p_negbTE        = _Logic "negbTE"

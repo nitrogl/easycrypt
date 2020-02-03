@@ -53,6 +53,8 @@ elim n=> [|n le0_n ih];first by rewrite dlist0 //;apply dunit_ll.
 by rewrite dlistS //;apply/dmap_ll/dprod_ll.
 qed.
 
+hint exact random : dlist_ll.
+
 lemma supp_dlist0 (d : 'a distr) n xs:
   n <= 0 =>
   xs \in dlist d n <=> xs = [].
@@ -69,6 +71,10 @@ rewrite dlistS // supp_dmap /=;split => [[p]|].
   by rewrite Hp Ha addzC. 
 case xs => //= [/# | x xs [# Hs Hin Ha]];exists (x,xs);smt (supp_dprod).
 qed.
+
+lemma supp_dlist_size (d : 'a distr) n xs:
+  0 <= n => xs \in dlist d n => size xs = n.
+proof. by move=> ge0_n; case/(supp_dlist d n xs ge0_n). qed.
 
 lemma dlist1E (d : 'a distr) n xs:
   0 <= n =>
