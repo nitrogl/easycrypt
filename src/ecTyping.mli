@@ -114,6 +114,7 @@ type tyerror =
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
+exception ProtectedTypeError of string
 
 val tyerror : EcLocation.t -> env -> tyerror -> 'a
 

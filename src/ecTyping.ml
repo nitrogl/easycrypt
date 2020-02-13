@@ -125,6 +125,8 @@ exception TyError of EcLocation.t * EcEnv.env * tyerror
 
 let tyerror loc env e = raise (TyError (loc, env, e))
 
+exception ProtectedTypeError of string
+
 (* -------------------------------------------------------------------- *)
 type restriction_who =
 | RW_mod of EcPath.mpath
@@ -1282,6 +1284,22 @@ let transexpcast_opt (env : EcEnv.env) mode ue oty e =
   | Some t -> transexpcast env mode ue t e
 
 (* -------------------------------------------------------------------- *)
+let rec transexp_lookup_ty (env : EcEnv.env) ue e lty =
+      EcTypes.ty_equal e.e_ty lty
+  ||  try  EcUnify.unify env ue e.e_ty lty; true
+      with EcUnify.UnificationFailure pb -> false
+  ||  match e.e_node with
+      | Ematch (e, es, _)
+      | Eapp (e, es)      -> transexp_lookup_tys env ue (e::es) lty
+      | Elet (_, e1, e2)  -> transexp_lookup_tys env ue [e1; e2] lty
+      | Etuple es         -> transexp_lookup_tys env ue es lty
+      | Eif (e1, e2, e3)  -> transexp_lookup_tys env ue [e1; e2; e3] lty
+      | Eproj (e, _)
+      | Equant (_, _, e)  -> transexp_lookup_ty  env ue e lty
+      | _ -> false
+and transexp_lookup_tys (env : EcEnv.env) ue es lty = List.filter (fun e -> transexp_lookup_ty env ue e lty) es <> []
+
+(* -------------------------------------------------------------------- *)
 let lookup_module_type (env : EcEnv.env) (name : pqsymbol) =
   match EcEnv.ModTy.lookup_opt (unloc name) env with
   | None   -> tyerror name.pl_loc env (UnknownTyModName (unloc name))
@@ -1913,7 +1931,9 @@ and transinstr
         let lvalue, lty = translvalue ue env plvalue in
         let rvalue, rty = transexp env `InProc ue prvalue in
           unify_or_fail env ue prvalue.pl_loc ~expct:lty rty;
-          [ i_asgn (lvalue, rvalue) ]
+          if (transexp_lookup_ty env ue rvalue (tleakable lty))
+            then raise (ProtectedTypeError "Only </ secure assignment operator is allowed with leakable type.")
+            else [ i_asgn (lvalue, rvalue) ]
     end
 
   | PSsecasgn (plvalue, prvalue) ->
