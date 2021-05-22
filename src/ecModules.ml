@@ -37,15 +37,15 @@ let lv_equal lv1 lv2 =
              (EcTypes.pv_equal pv1 pv2)
           && (EcTypes.ty_equal ty1 ty2))
         tu1 tu2
-
+ 
   | LvMap ((p1, tys1), pv1, e1, ty1),
     LvMap ((p2, tys2), pv2, e2, ty2) ->
-
          (EcPath.p_equal   p1  p2 )
       && (EcTypes.pv_equal pv1 pv2)
       && (EcTypes.e_equal  e1  e2 )
       && (EcTypes.ty_equal ty1 ty2)
       && (List.all2 EcTypes.ty_equal tys1 tys2)
+
 
   | _, _ -> false
 
@@ -394,7 +394,7 @@ end = struct
 
   let lv_tuple (lv, pvs) pvs' =
     if pvs == pvs' then lv else LvTuple pvs'
-
+ 
   let lv_map (lv, ((p, tys), pv, e, ty)) ((p', tys'), pv', e', ty') =
     if   p == p' && tys == tys' && pv == pv' && e == e' && ty == ty'
     then lv else LvMap ((p', tys'), pv', e', ty')
@@ -459,7 +459,6 @@ let s_subst (s : EcTypes.e_subst) =
         let pv'  = EcTypes.pv_subst s.EcTypes.es_xp pv in
         let e'   = e_subst e in
         let ty'  = s.EcTypes.es_ty ty in
-
         ISmart.lv_map (lv, lvmap) ((p', tys'), pv', e', ty')
   in
 
@@ -521,17 +520,14 @@ let rec lv_get_uninit_read (w : Sx.t) (lv : lvalue) =
 
   match lv with
   | LvVar (x, _) ->
-      let w = Sx.union (sx_of_pv x) w in
-      (w, Sx.empty)
+      Sx.union (sx_of_pv x) w
 
   | LvTuple xs ->
       let w' = List.map (sx_of_pv |- fst) xs in
-      (Sx.big_union (w :: w'), Sx.empty)
+      Sx.big_union (w :: w')
 
-  | LvMap (_, x, e, _) ->
-      let r = Sx.diff (Uninit.e_pv is_loc e) w in
-      let w = Sx.union (sx_of_pv x) w in
-      (w, r)
+  | LvMap (_, x, _, _) ->
+      Sx.union (sx_of_pv x) w
 
 and s_get_uninit_read (w : Sx.t) (s : stmt) =
   let do1 (w, r) i =
@@ -542,15 +538,16 @@ and s_get_uninit_read (w : Sx.t) (s : stmt) =
 
 and i_get_uninit_read (w : Sx.t) (i : instr) =
   match i.i_node with
-  | Sasgn (lv, e) | Ssecasgn (lv, e) | Srnd (lv, e) | Ssecrnd (lv, e) ->
-      let     r1 = Sx.diff (Uninit.e_pv is_loc e) w in
-      let w2, r2 = lv_get_uninit_read w lv in
-      (Sx.union w w2, Sx.union r1 r2)
+  | Ssecasgn (lv, e) | Ssecrnd (lv, e)
+  | Sasgn (lv, e) | Srnd (lv, e) ->
+      let r1 = Sx.diff (Uninit.e_pv is_loc e) w in
+      let w2 = lv_get_uninit_read w lv in
+      (Sx.union w w2, r1)
 
   | Scall (olv, _, args) ->
       let r1    = Sx.diff (Sx.big_union (List.map (Uninit.e_pv is_loc) args)) w in
-      let w, r2 = olv |> omap (lv_get_uninit_read w) |> odfl (w, Sx.empty) in
-      (w, Sx.union r1 r2)
+      let w = olv |> omap (lv_get_uninit_read w) |> odfl w in
+      (w, r1)
 
   | Sif (e, s1, s2) ->
       let r = Sx.diff (Uninit.e_pv is_loc e) w in

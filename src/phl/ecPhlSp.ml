@@ -135,7 +135,6 @@ module LowInternal = struct
     match lv with
     | LvVar   v  -> for_lvars [v]
     | LvTuple vs -> for_lvars vs
-
     | LvMap ((p, tys), pv, e', ty) ->
         let mtype = toarrow [ty; e'.e_ty; e.e_ty] ty in
         let set   = e_op p tys mtype in

@@ -12,6 +12,52 @@ require (*--*) Bigop Bigalg.
 (*---*) import RField IntID IntOrder.
 
 (* -------------------------------------------------------------------- *)
+theory Bigbool.
+theory BBXor.
+clone include Bigop with
+  type t <- bool,
+    op Support.idm   <- false,
+    op Support.( + ) <- Bool.( ^^ )
+
+proof Support.Axioms.* by smt().
+end BBXor.
+
+theory BBOr.
+clone include Bigop with
+  type t <- bool,
+    op Support.idm   <- false,
+    op Support.( + ) <- ( \/ )
+
+proof Support.Axioms.* by smt().
+
+lemma bigP (P F : 'a -> bool) (xs : 'a list):
+  big P F xs <=> has F (filter P xs).
+proof.
+elim: xs=> //= x xs ih.
+rewrite big_cons; case: (P x)=> //=.
+by rewrite ih.
+qed.
+end BBOr.
+
+theory BBAnd.
+clone include Bigop with
+  type t <- bool,
+    op Support.idm   <- true,
+    op Support.( + ) <- ( /\ )
+
+proof Support.Axioms.* by smt().
+
+lemma bigP (P F : 'a -> bool) (xs : 'a list):
+  big P F xs <=> all F (filter P xs).
+proof.
+elim: xs=> //= x xs ih.
+rewrite big_cons; case: (P x)=> //=.
+by rewrite ih.
+qed.
+end BBAnd.
+end Bigbool.
+
+(* -------------------------------------------------------------------- *)
 theory Bigint.
 clone include Bigalg.BigOrder with
   type t <- int,
@@ -23,12 +69,15 @@ clone include Bigalg.BigOrder with
     op Num.Domain.( * )  <- Int.( * ),
     op Num.Domain.invr   <- (fun (z : int) => z),
     op Num.Domain.intmul <- IntID.intmul,
-    op Num.Domain.ofint  <- IntID.ofint,
+    op Num.Domain.ofint  <- IntID.ofint_id,
     op Num.Domain.exp    <- IntID.exp,
+    op Num.Domain.lreg   <- IntID.lreg,
 
     op Num."`|_|" <- Int."`|_|",
     op Num.( <= ) <- Int.(<=),
-    op Num.( <  ) <- Int.(< )
+    op Num.( <  ) <- Int.(< ),
+    op Num.minr   <- Int.min,
+    op Num.maxr   <- Int.max
 
     proof Num.Domain.* by smt(), Num.Axioms.* by smt()
 
@@ -44,6 +93,11 @@ proof. by elim: ss=> [|s ss ih] //=; rewrite BIA.big_cons -ih. qed.
 lemma nosmt big_constz (P : 'a -> bool) x s:
   BIA.big P (fun i => x) s = x * (count P s).
 proof. by rewrite BIA.sumr_const -IntID.intmulz. qed.
+
+lemma nosmt bigi_constz x (n m:int):
+  n <= m =>
+  BIA.bigi predT (fun i => x) n m = x * (m - n).
+proof. by move=> ?; rewrite BIA.sumri_const // -IntID.intmulz. qed.
 
 lemma nosmt big_count (P : 'a -> bool) s:
     BIA.big P (fun (x : 'a) => count (pred1 x) s) (undup s)
@@ -89,10 +143,13 @@ clone include Bigalg.BigOrder with
     op Num.Domain.intmul <- RField.intmul,
     op Num.Domain.ofint  <- RField.ofint,
     op Num.Domain.exp    <- RField.exp,
+    op Num.Domain.lreg   <- RField.lreg,
 
     op Num."`|_|" <- Real."`|_|",
     op Num.( <= ) <- Real.(<=),
-    op Num.( <  ) <- Real.(< )
+    op Num.( <  ) <- Real.(< ),
+    op Num.minr    = fun (x y : real), if x <= y then x else y,
+    op Num.maxr    = fun (x y : real), if y <= x then x else y
 
     proof Num.Domain.* by smt, Num.Axioms.* by smt
 
@@ -122,13 +179,18 @@ lemma sumr_const (P : 'a -> bool) (x : real) (s : 'a list):
   BRA.big P (fun (i : 'a) => x) s = (count P s)%r * x.
 proof. by rewrite sumr_const RField.intmulr RField.mulrC. qed.
 
+lemma sumri_const (x : real) (n m : int):
+  n <= m => 
+  BRA.bigi predT (fun _ => x) n m = (m - n)%r * x.
+proof. by move=> ?; rewrite sumri_const // RField.intmulr RField.mulrC. qed.
+
 lemma sumr1 (s : 'a list) :
   BRA.big predT (fun i => 1%r) s = (size s)%r.
 proof. by rewrite sumr_const count_predT RField.mulr1. qed.
 
 lemma sumr1_int (n : int) : 0 <= n =>
   BRA.bigi predT (fun i => 1%r) 0 n = n%r.
-proof. by move=> ge0_n; rewrite sumr1 size_range max_ler. qed.
+proof. by move=> ge0_n; rewrite sumr1 size_range ler_maxr. qed.
 
 lemma sumidE n : 0 <= n =>
   BRA.bigi predT (fun i => i%r) 0 n = (n * (n - 1))%r / 2%r.
