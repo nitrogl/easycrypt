@@ -1569,7 +1569,7 @@ and transmodsig_body
 
 type lvmap = (path * ty list) *  prog_var * expr * ty
 
-(*type lVAl =
+type lVAl =
   | Lval  of lvalue
   | LvMap of lvmap
 
@@ -1606,7 +1606,7 @@ let i_secrnd_lv loc env lv e =
 let i_call_lv loc env lv f args =
   match lv with
   | Lval lv -> i_call (Some lv, f, args)
-  | LvMap _ -> tyerror loc env LvMapOnNonAssign*)
+  | LvMap _ -> tyerror loc env LvMapOnNonAssign
 
 (* -------------------------------------------------------------------- *)
 let rec transmod ~attop (env : EcEnv.env) (me : pmodule_def) =
