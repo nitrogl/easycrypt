@@ -836,7 +836,7 @@ and replay_auto
 =
   let ps = List.map (EcSubst.subst_path subst) ps in
   let ps = List.filter (fun p ->
-      Option.is_some (EcEnv.Ax.by_path_opt p (ove.ovre_hooks.henv scope))
+      EcUtils.is_some (EcEnv.Ax.by_path_opt p (ove.ovre_hooks.henv scope))
     ) ps in
   let scope = ove.ovre_hooks.hauto scope (lc, lvl, base, ps) in
   (subst, ops, proofs, scope)
