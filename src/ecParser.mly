@@ -440,7 +440,6 @@
 %token EXPECT
 %token EXPORT
 %token FEL
-%token FINAL
 %token FIRST
 %token FISSION
 %token FOR
@@ -593,6 +592,7 @@
 %token ZETA
 %token <string> NOP LOP1 ROP1 LOP2 ROP2 LOP3 ROP3 LOP4 ROP4 NUMOP
 %token LTCOLON DASHLT GT LT GE LE LTSTARGT LTLTSTARGT LTSTARGTGT
+%token < Lexing.position> FINAL
 
 %nonassoc prec_below_comma
 %nonassoc COMMA ELSE
@@ -3410,7 +3410,7 @@ clone_lemma_base:
 clone_lemma_1_core:
 | l=genqident(clone_lemma_base) {
     match unloc l with
-    | (xs, `Named x ) -> `Named (mk_loc l.pl_loc (xs, x))
+    | (xs, `Named x ) -> `Named (mk_loc l.pl_loc (xs, x), `Alias)
     | (xs, `All tags) -> begin
       match List.rev xs with
       | []      -> `All (None, tags)
@@ -3455,8 +3455,9 @@ clone_clear:
 | REMOVE cl=clone_clear_1+ { List.flatten cl }
 
 opclmode:
-| EQ     { `Alias }
-| LARROW { `Inline }
+| EQ       { `Alias         }
+| LARROW   { `Inline `Clear }
+| LE       { `Inline `Keep  }
 
 cltyparams:
 | empty { [] }
@@ -3464,60 +3465,46 @@ cltyparams:
 | xs=paren(plist1(tident, COMMA)) { xs }
 
 clone_override:
-| TYPE ps=cltyparams x=qident EQ t=loc(type_exp)
-   { (x, PTHO_Type (ps, t, `Alias)) }
+| TYPE ps=cltyparams x=qident mode=opclmode t=loc(type_exp)
+   { (x, PTHO_Type (`BySyntax (ps, t), mode)) }
 
-| TYPE ps=cltyparams x=qident LARROW t=loc(type_exp)
-   { (x, PTHO_Type (ps, t, `Inline)) }
+| OP st=nosmt x=qoident tyvars=bracket(tident*)?
+    p=ptybinding1* sty=ioption(prefix(COLON, loc(type_exp)))
+    mode=loc(opclmode) e=expr
 
-| OP st=nosmt x=qoident tyvars=bracket(tident*)? COLON sty=loc(type_exp) mode=opclmode e=expr
    { let ov = {
        opov_nosmt  = st;
        opov_tyvars = tyvars;
-       opov_args   = [];
-       opov_retty  = sty;
+       opov_args   = List.flatten p;
+       opov_retty  = odfl (mk_loc mode.pl_loc PTunivar) sty;
        opov_body   = e;
      } in
-       (x, PTHO_Op (ov, mode)) }
 
-| OP st=nosmt x=qoident tyvars=bracket(tident*)? mode=loc(opclmode) e=expr
-   { let ov = {
-       opov_nosmt  = st;
-       opov_tyvars = tyvars;
-       opov_args   = [];
-       opov_retty  = mk_loc mode.pl_loc PTunivar;
-       opov_body   = e;
-     } in
-       (x, PTHO_Op (ov, unloc mode)) }
+     (x, PTHO_Op (`BySyntax ov, unloc mode)) }
 
-| OP st=nosmt x=qoident tyvars=bracket(tident*)? p=ptybindings mode=loc(opclmode) e=expr
-   { let ov = {
-       opov_nosmt  = st;
-       opov_tyvars = tyvars;
-       opov_args   = p;
-       opov_retty  = mk_loc mode.pl_loc PTunivar;
-       opov_body   = e;
-     } in
-       (x, PTHO_Op (ov, unloc mode)) }
-
-| PRED x=qoident tyvars=bracket(tident*)? p=ptybindings mode=loc(opclmode) f=form
+| PRED x=qoident tyvars=bracket(tident*)? p=ptybinding1* mode=loc(opclmode) f=form
    { let ov = {
        prov_tyvars = tyvars;
-       prov_args   = p;
+       prov_args   = List.flatten p;
        prov_body   = f;
      } in
-       (x, PTHO_Pred (ov, unloc mode)) }
 
-| PRED x=qoident tyvars=bracket(tident*)? mode=loc(opclmode) f=form
-   { let ov = {
-       prov_tyvars = tyvars;
-       prov_args   = [];
-       prov_body   = f;
-     } in
-       (x, PTHO_Pred (ov, unloc mode)) }
+      (x, PTHO_Pred (`BySyntax ov, unloc mode)) }
 
-| THEORY x=uqident LARROW y=uqident
-   { (x, PTHO_Theory y) }
+| AXIOM x=qoident mode=loc(opclmode) y=qoident
+  { x, PTHO_Axiom (y, unloc mode) }
+
+| LEMMA x=qoident mode=loc(opclmode) y=qoident
+  { x, PTHO_Axiom (y, unloc mode) }
+
+| MODULE x=uqident mode=loc(opclmode) y=uqident
+   { (x, PTHO_Module (y, unloc mode)) }
+
+| MODULE TYPE x=uqident mode=loc(opclmode) y=uqident
+   { (x, PTHO_ModTyp (y, unloc mode)) }
+
+| THEORY x=uqident mode=loc(opclmode) y=uqident
+   { (x, PTHO_Theory (y, unloc mode)) }
 
 realize:
 | REALIZE x=qident
@@ -3687,8 +3674,9 @@ stop:
 | DROP DOT { }
 
 global:
-| tm=boption(TIME) g=loc(global_action) FINAL
-  { { gl_action = g; gl_timed = tm; } }
+| tm=boption(TIME) g=global_action ep=FINAL
+  { let lc = EcLocation.make $startpos ep in
+    { gl_action = EcLocation.mk_loc lc g; gl_timed = tm; } }
 
 prog_r:
 | g=global { P_Prog ([g], false) }
