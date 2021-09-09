@@ -20,9 +20,7 @@ require import SmtMap.
 
 (* -------------------------------------------------------------------- *)
 (*
- * This is different from Known|Unkown flags you can read in crypto/rom/PROM.
- * Secret and Unknown should both model confidentiality when it holds, but
- * Leaked does not mean Known, but that it is partially known.
+ * This is similar to Known|Unkown flags you can read in crypto/rom/PROM.
  *)
 type confidentiality = [ SECRET | LEAKED ].
 type 'a leakable = 'a * ('a distr) option * confidentiality.
@@ -54,10 +52,19 @@ abbrev (===) ['a] (v w: ('a leakable) option) = ovd_eq v w.
 abbrev (<=)  ['a] (v: 'a leakable) (d: 'a distr) = sampled_from d v.
 
 (* -------------------------------------------------------------------- *)
-(* This can be used in proofs when convenient *)
+(* These can be used in proofs when convenient *)
+op secrndasgn_invariant ['a] (v w: ('a leakable) option) (d: 'a distr) = 
+     (w <> None => oget w <= d)
+  /\ (v <> None => w <> None /\ v === w)
+  /\ (v <> None => is_leaked (oget w) => v = w)
+  /\ (v = None => w <> None => is_secret (oget w))
+.
 op secrndasgn_invariant_fmap ['a, 'b] (l m: ('a, 'b leakable) fmap) (d: 'b distr) =
      (forall x, dom m x => oget m.[x] <= d)
   /\ (forall x, dom l x => dom m x /\ l.[x] === m.[x])
   /\ (forall x, dom l x => is_leaked (oget m.[x]) => l.[x] = m.[x])
   /\ (forall x, !dom l x => dom m x => is_secret (oget m.[x]))
 .
+
+pred confidential_function: 'a -> 'b.
+pred confidential_fmap: ('a, 'b) fmap.
