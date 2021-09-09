@@ -68,6 +68,10 @@ val is_tdistr : ty -> bool
 val as_tdistr : ty -> ty option
 
 (* -------------------------------------------------------------------- *)
+val is_tleakable : ty -> bool
+val as_tleakable : ty -> ty option
+
+(* -------------------------------------------------------------------- *)
 exception FoundUnivar
 
 val ty_check_uni : ty -> unit

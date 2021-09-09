@@ -1302,6 +1302,67 @@ let rec transexp_lookup_ty (env : EcEnv.env) ue e lty =
 and transexp_lookup_tys (env : EcEnv.env) ue es lty = List.filter (fun e -> transexp_lookup_ty env ue e lty) es <> []
 
 (* -------------------------------------------------------------------- *)
+
+let pp_stuff env e i = EcEnv.notify ~immediate:false env `Warning
+            "expression type: %a (%b) - %d"
+            (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) e.e_ty
+            (EcTypes.is_tleakable e.e_ty)
+            i
+            
+let pp_ty_stuff env ty = EcEnv.notify ~immediate:false env `Warning
+            "type: %a (%b)"
+            (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty
+            (EcTypes.is_tleakable ty)
+            
+let rec ty_contains_leakable (env : EcEnv.env) ty =
+(*       pp_ty_stuff env ty; *)
+      EcTypes.is_tleakable ty
+  ||  match ty.ty_node with
+      | Tglob   (_)
+      | Tunivar (_)
+      | Tvar    (_)        -> false
+      | Tconstr (p, tys)   -> EcPath.p_equal p EcCoreLib.CI_Leakable.p_leakable || tys_contain_leakable env tys
+      | Ttuple  (tys)      -> tys_contain_leakable env tys
+      | Tfun    (ty1, ty2) -> tys_contain_leakable env [ty1; ty2]
+and tys_contain_leakable (env : EcEnv.env) tys = List.filter (fun ty -> ty_contains_leakable env ty) tys <> []
+
+let rec contains_leakable (env : EcEnv.env) e =
+(*       pp_stuff env e; *)
+      EcTypes.is_tleakable e.e_ty
+  ||  match e.e_node with
+      | Elocal _
+      | Evar _            -> ty_contains_leakable env e.e_ty
+      | Ematch (e, es, _)
+      | Eapp (e, es)      -> contain_leakable env (e::es)
+      | Elet (_, e1, e2)  -> contain_leakable env [e1; e2]
+      | Eop (_, es)       -> List.filter (fun e -> EcTypes.is_tleakable e) es <> []
+      | Etuple es         -> contain_leakable env es
+      | Eif (e1, e2, e3)  -> contain_leakable env [e1; e2; e3]
+      | Eproj (e, _)
+      | Equant (_, _, e)  -> contains_leakable env e
+      | Eint _ -> false
+and contain_leakable (env : EcEnv.env) es = List.filter (fun e -> contains_leakable env e) es <> []
+
+let rec is_fmap_dom e =
+  match e.e_node with
+  | Eop  (p, _) -> EcPath.p_equal EcCoreLib.CI_FMap.p_dom p
+  | Eapp (e, _) -> is_fmap_dom e
+  | _          -> false
+  
+let rec is_op_not e =
+  match e.e_node with
+  | Eop  (p, _) -> EcPath.p_equal EcCoreLib.CI_Bool.p_not p
+  | Eapp (e, _) -> is_op_not e
+  | _          -> false
+
+let rec is_fmap_not_dom e =
+  if is_op_not e then
+    match e.e_node with
+    | Eapp (_, es) -> is_fmap_dom (List.nth es 0) || is_fmap_not_dom (List.nth es 0)
+    | _            -> false
+  else false
+  
+(* -------------------------------------------------------------------- *)
 let lookup_module_type (env : EcEnv.env) (name : pqsymbol) =
   match EcEnv.ModTy.lookup_opt (unloc name) env with
   | None   -> tyerror name.pl_loc env (UnknownTyModName (unloc name))
@@ -2000,7 +2061,7 @@ and transinstr
         let lvalue, lty = translvalue ue env plvalue in
         let rvalue, rty = transexp env `InProc ue prvalue in
           unify_or_fail env ue prvalue.pl_loc ~expct:lty rty;
-          if (transexp_lookup_ty env ue rvalue (tleakable lty))
+          if (contains_leakable env rvalue(* || ty_contains_leakable env lty*))
             then raise (ProtectedTypeError "Only </ secure assignment operator is allowed with leakable type.")
             else [ i_asgn (lvalue, rvalue) ]
 (*             else [ i_asgn_lv i.pl_loc env lvalue rvalue ] *)
@@ -2010,8 +2071,8 @@ and transinstr
       let lvalue, lty = translvalue ue env plvalue in
       let rvalue, rty = transexp env `InProc ue prvalue in
       unify_or_fail env ue prvalue.pl_loc ~expct:(tleakable lty) rty;
-      [ i_asgn(lvalue, rvalue) ]
-(*       [ i_asgn_lv i.pl_loc env lvalue rvalue ] *)
+      [ i_secasgn(lvalue, rvalue) ]
+(*       [ i_secasgn_lv i.pl_loc env lvalue rvalue ] *)
 
   | PSrnd (plvalue, prvalue) ->
       let lvalue, lty = translvalue ue env plvalue in
@@ -2045,7 +2106,10 @@ and transinstr
         let e, ety = transexp env `InProc ue pe in
         let s = transstmt env ue s in
         unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
-        i_if (e, s, sel)
+        pp_stuff env e;
+        if (contains_leakable env e && not ((is_fmap_dom e) || (is_fmap_not_dom e)))
+          then raise (ProtectedTypeError "If condition only supports domain belonging tests with leakable-type.")
+          else i_if (e, s, sel)
 
       and for1_s (pe, s) sel = stmt [for1_i (pe, s) sel] in
 
@@ -2057,12 +2121,16 @@ and transinstr
       let e, ety = transexp env `InProc ue pe in
       let body = transstmt env ue pbody in
       unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
-      [ i_while (e, body) ]
+        if (contains_leakable env e)
+        then raise (ProtectedTypeError "While condition does not support leakable-type.")
+        else [ i_while (e, body) ]
 
   | PSassert pe ->
       let e, ety = transexp env `InProc ue pe in
       unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
-      [ i_assert e ]
+        if (contains_leakable env e)
+        then raise (ProtectedTypeError "Assert does not support leakable-type.")
+        else [ i_assert e ]
 
 (* -------------------------------------------------------------------- *)
 and trans_pv env { pl_desc = x; pl_loc = loc } =

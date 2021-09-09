@@ -179,6 +179,7 @@ module CI_FMap : sig
   val p_get  : path
   val p_set  : path
   val p_cst  : path
+  val p_dom  : path
 end
 
 (* -------------------------------------------------------------------- *)

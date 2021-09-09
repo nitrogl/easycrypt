@@ -186,6 +186,7 @@ module CI_FMap = struct
   let p_get = _Map s_get
   let p_set = _Map s_set
   let p_cst = _Map "cst"
+  let p_dom = _Map "dom"
 end
 
 (* -------------------------------------------------------------------- *)
