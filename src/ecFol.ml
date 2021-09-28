@@ -207,6 +207,11 @@ let f_sampled_from env f1 f2 = f_app (fop_sampled_from (proj_distr_ty env f1.f_t
 let f_secret = f_op CI.CI_Leakable.p_secret [] tconfidentiality
 let f_leaked = f_op CI.CI_Leakable.p_leaked [] tconfidentiality
 
+let fop_proper_d ty =
+  f_op CI.CI_Leakable.p_proper_d [ty] (toarrow [tdistr ty] tbool)
+let f_proper_d env f =
+  f_app (fop_proper_d (proj_distr_ty env f.f_ty)) [f] tbool
+  
 let fop_secrndasgn_invariant_fmap ty1 ty2 =
   f_op CI.CI_Leakable.p_secrndasgn_invariant_fmap [ty1; ty2] (toarrow [
       tfmap (ttuple [ty1; tleakable ty2])

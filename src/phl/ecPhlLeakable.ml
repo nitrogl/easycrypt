@@ -11,6 +11,7 @@
 open EcUtils
 open EcFol
 open EcTypes
+open EcParsetree
 open EcModules
 
 open EcCoreGoal
@@ -160,26 +161,68 @@ let secrnd_hoare_r m s tc =
   let et = e_tuple [e_sv; e_odistr; e_secret] in
   let assignment = s_asgn (lv, et) in
   
-  (* TODO: Additionally, we need the distribution not to be a singleton? *)
   let s' = s_seq s' sampling in
   let s' = s_seq s' assignment in
   s'
 
 (* -------------------------------------------------------------------- *)
+(* -------------------------------------------------------------------- *)
+let secrnd_hoare_r_post m s tc =
+  let env = FApi.tc1_env tc in
+  let (lv, distr), s' = tc1_last_secrnd tc s in
+  let dty = e_ty distr in
+  
+  (* Not a singleton, or "secret" will be semantically wrong. *)
+  let distr_f = form_of_expr (fst m) distr in
+  let post = f_proper_d env distr_f in
+  post
+
+(* -------------------------------------------------------------------- *)
 let t_hoare_secrnd_r tc =
   let hs = tc1_as_hoareS tc in
-  let concl = f_hoareS_r { hs with hs_s=secrnd_hoare_r hs.hs_m hs.hs_s tc; } in
-  FApi.xmutate1 tc `SecAsgn [concl]
+  let _, s' = tc1_last_secrnd tc hs.hs_s in
+  
+  let proper = f_hoareS_r { hs with
+    hs_s=s';
+    hs_po=secrnd_hoare_r_post hs.hs_m hs.hs_s tc;
+  } in
+  let concl  = f_hoareS_r { hs with
+    hs_s=secrnd_hoare_r hs.hs_m hs.hs_s tc;
+  } in
+  FApi.xmutate1 tc `SecAsgn [proper; concl]
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_secrnd_r tc =
   let bhs = tc1_as_bdhoareS tc in
-  let concl = f_bdHoareS_r { bhs with bhs_s=secrnd_hoare_r bhs.bhs_m bhs.bhs_s tc; } in
-  FApi.xmutate1 tc `SecAsgn [concl]
+  let _, s' = tc1_last_secrnd tc bhs.bhs_s in
+  
+  let proper = f_bdHoareS_r { bhs with
+    bhs_s=s';
+    bhs_po=secrnd_hoare_r_post bhs.bhs_m bhs.bhs_s tc;
+  } in
+  let concl = f_bdHoareS_r { bhs with
+    bhs_s=secrnd_hoare_r bhs.bhs_m bhs.bhs_s tc;
+  } in
+  FApi.xmutate1 tc `SecAsgn [proper; concl]
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_secrnd_sided_r side tc =
   let es = tc1_as_equivS tc in
+  let proper =
+    match side with
+    | `Left  ->
+        let _, s' = tc1_last_secrnd tc es.es_sl in
+        f_equivS_r { es with
+          es_sl=s';
+          es_po=secrnd_hoare_r_post es.es_ml es.es_sl tc;
+        }
+    | `Right ->
+        let _, s' = tc1_last_secrnd tc es.es_sr in
+        f_equivS_r { es with
+          es_sr=s';
+          es_po=secrnd_hoare_r_post es.es_mr es.es_sr tc;
+        }
+  in
   let concl =
     match side with
     | `Left  ->
@@ -187,7 +230,7 @@ let t_equiv_secrnd_sided_r side tc =
     | `Right ->
         f_equivS_r { es with es_sr=secrnd_hoare_r es.es_mr es.es_sr tc; }
   in
-  FApi.xmutate1 tc `SecAsgn [concl]
+  FApi.xmutate1 tc `SecAsgn [proper; concl]
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_secrnd   = FApi.t_low1 "equiv-secrnd"   t_equiv_secrnd_sided_r

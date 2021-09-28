@@ -20,7 +20,8 @@ require import SmtMap.
 
 (* -------------------------------------------------------------------- *)
 (*
- * This is similar to Known|Unkown flags you can read in crypto/rom/PROM.
+ * This is similar to Known|Unkown flags you can read in crypto/rom/PROM
+ * but allows to avoid resampling and complex eager tactics
  *)
 type confidentiality = [ SECRET | LEAKED ].
 type 'a leakable = 'a * ('a distr) option * confidentiality.
@@ -35,7 +36,7 @@ op sampled_from ['a] (d: 'a distr) (v: 'a leakable) = v.`2 = Some d.
  * value can be "sampled" from.
  * So we call a proper distribution the non-singletons.
  *)
-pred is_distr_singleton (d: 'a distr) = exists x, support d x => mu1 d x = 1%r.
+pred is_distr_singleton (d: 'a distr) = exists x, mu1 d x = 1%r.
 pred distr_proper (d: 'a distr) = !is_distr_singleton d.
 
 op vget ['a] (olx: ('a leakable) option) = inst (oget olx).

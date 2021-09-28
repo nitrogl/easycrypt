@@ -83,6 +83,7 @@ val f_inst         : EcTypes.ty -> form -> form
 val f_secret       : form
 val f_leaked       : form
 
+val f_proper_d : EcEnv.env -> form -> form
 val f_secrndasgn_invariant_fmap : EcTypes.ty -> EcTypes.ty -> form -> form -> form -> form
 
 (* common functions *)
